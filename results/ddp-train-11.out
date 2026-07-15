@@ -1,0 +1,13 @@
+[rank 0] host=ip-10-42-20-111 world_size=16 torch=2.6.0+cu124 cuda=12.4 gpu=NVIDIA H200
+NCCL version 2.21.5+cuda12.4
+[rank 0] step 0/100 loss=0.9960 elapsed=0.4s
+[rank 0] step 10/100 loss=1.0000 elapsed=0.7s
+[rank 0] step 20/100 loss=0.9980 elapsed=0.9s
+[rank 0] step 30/100 loss=1.0013 elapsed=1.2s
+[rank 0] step 40/100 loss=1.0006 elapsed=1.5s
+[rank 0] step 50/100 loss=0.9951 elapsed=1.8s
+[rank 0] step 60/100 loss=0.9998 elapsed=2.1s
+[rank 0] step 70/100 loss=1.0008 elapsed=2.4s
+[rank 0] step 80/100 loss=0.9982 elapsed=2.7s
+[rank 0] step 90/100 loss=0.9925 elapsed=3.0s
+[rank 0] SUCCESS: 100 steps in 3.2s (16239.4 samples/sec across 16 GPUs)

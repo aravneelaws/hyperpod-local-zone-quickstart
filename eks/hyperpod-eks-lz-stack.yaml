@@ -1,0 +1,523 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  HyperPod EKS cluster in an AWS Local Zone.
+  Creates VPC with 2 parent-AZ subnets (EKS control plane) + 1 LZ subnet (HyperPod worker instance group).
+  Also creates EKS cluster, HyperPod cluster, FSx Lustre in parent AZ, and required IAM/SG.
+  Tested with p5e.48xlarge in Phoenix Local Zone (us-west-2-phx-2a).
+
+Parameters:
+  ResourceNamePrefix:
+    Type: String
+    Default: hyperpod-eks-lz
+    Description: Prefix for named resources.
+  VpcCidr:
+    Type: String
+    Default: 10.44.0.0/16
+    Description: VPC CIDR (must NOT overlap with the Slurm stack CIDR 10.42.0.0/16).
+  ParentAz1:
+    Type: String
+    Default: us-west-2a
+    Description: First parent AZ for EKS control plane HA.
+  ParentAz2:
+    Type: String
+    Default: us-west-2b
+    Description: Second parent AZ (must be the LZ's parent AZ).
+  LocalZone:
+    Type: String
+    Default: us-west-2-phx-2a
+    Description: Local Zone for HyperPod worker instance group.
+  ParentAz1SubnetCidr:
+    Type: String
+    Default: 10.44.10.0/24
+    Description: Parent AZ 1 public subnet CIDR.
+  ParentAz2SubnetCidr:
+    Type: String
+    Default: 10.44.11.0/24
+    Description: Parent AZ 2 public subnet CIDR.
+  ParentAz1PrivateSubnetCidr:
+    Type: String
+    Default: 10.44.20.0/24
+    Description: Parent AZ 1 private subnet CIDR (for EKS worker eth0).
+  ParentAz2PrivateSubnetCidr:
+    Type: String
+    Default: 10.44.21.0/24
+    Description: Parent AZ 2 private subnet CIDR (for EKS worker eth0).
+  LzSubnetCidr:
+    Type: String
+    Default: 10.44.30.0/24
+    Description: LZ subnet CIDR for HyperPod worker instance group.
+  KubernetesVersion:
+    Type: String
+    Default: "1.31"
+    Description: EKS Kubernetes version.
+  AcceleratedInstanceType:
+    Type: String
+    Default: ml.p5e.48xlarge
+    Description: Worker instance type (must be available in the LZ).
+  AcceleratedInstanceCount:
+    Type: Number
+    Default: 2
+    Description: Number of accelerated instances.
+  TrainingPlanArn:
+    Type: String
+    Default: ""
+    Description: >
+      Training plan ARN for the accelerated instance group. Leave empty to use on-demand.
+      Example: arn:aws:sagemaker:us-west-2:123456789012:training-plan/my-plan
+  FsxStorageCapacityGiB:
+    Type: Number
+    Default: 1200
+    MinValue: 1200
+    Description: FSx Lustre capacity in GiB (min 1200 for PERSISTENT_2).
+  FsxPerUnitStorageThroughput:
+    Type: Number
+    Default: 250
+    AllowedValues: [125, 250, 500, 1000]
+
+Conditions:
+  HasTrainingPlan: !Not [!Equals [!Ref TrainingPlanArn, ""]]
+
+Resources:
+  # ==================== VPC ====================
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-vpc
+
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-igw
+
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref Igw
+
+  # ==================== Subnets ====================
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref ParentAz1SubnetCidr
+      AvailabilityZone: !Ref ParentAz1
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-public-${ParentAz1}
+        - Key: "kubernetes.io/role/elb"
+          Value: "1"
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref ParentAz2SubnetCidr
+      AvailabilityZone: !Ref ParentAz2
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-public-${ParentAz2}
+        - Key: "kubernetes.io/role/elb"
+          Value: "1"
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref ParentAz1PrivateSubnetCidr
+      AvailabilityZone: !Ref ParentAz1
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-private-${ParentAz1}
+        - Key: "kubernetes.io/role/internal-elb"
+          Value: "1"
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref ParentAz2PrivateSubnetCidr
+      AvailabilityZone: !Ref ParentAz2
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-private-${ParentAz2}
+        - Key: "kubernetes.io/role/internal-elb"
+          Value: "1"
+
+  LzSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref LzSubnetCidr
+      AvailabilityZone: !Ref LocalZone
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-lz-worker
+
+  # ==================== NAT + Routing ====================
+  NatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: IgwAttach
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-nat
+
+  PublicRt:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttach
+    Properties:
+      RouteTableId: !Ref PublicRt
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+
+  PublicSubnet1Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRt
+
+  PublicSubnet2Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRt
+
+  PrivateRt:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-private-rt
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRt
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet1Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRt
+
+  PrivateSubnet2Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRt
+
+  LzSubnetAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref LzSubnet
+      RouteTableId: !Ref PrivateRt
+
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PublicRt
+        - !Ref PrivateRt
+
+  # ==================== Security Group ====================
+  ClusterSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFA-friendly SG for HyperPod EKS cluster
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-sg
+
+  SgIngressSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: '-1'
+      SourceSecurityGroupId: !Ref ClusterSg
+
+  SgEgressSelf:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: '-1'
+      DestinationSecurityGroupId: !Ref ClusterSg
+
+  SgEgressAll:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: '-1'
+      CidrIp: 0.0.0.0/0
+
+  # ==================== FSx Lustre (parent AZ) ====================
+  FsxSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: FSx Lustre SG
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 988
+          ToPort: 988
+          SourceSecurityGroupId: !Ref ClusterSg
+        - IpProtocol: tcp
+          FromPort: 1018
+          ToPort: 1023
+          SourceSecurityGroupId: !Ref ClusterSg
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-fsx-sg
+
+  FsxSgIngressSelf988:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      SourceSecurityGroupId: !Ref FsxSg
+
+  FsxSgIngressSelfData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      SourceSecurityGroupId: !Ref FsxSg
+
+  FsxSgEgressToCluster988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref ClusterSg
+
+  FsxSgEgressToClusterData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref ClusterSg
+
+  FsxSgEgressSelf988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  FsxSgEgressSelfData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  ClusterSgEgressFsx988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  ClusterSgEgressFsxData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  FsxFileSystem:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: LUSTRE
+      StorageCapacity: !Ref FsxStorageCapacityGiB
+      SubnetIds:
+        - !Ref PublicSubnet2  # parent AZ (us-west-2b, matches LZ's parent)
+      SecurityGroupIds:
+        - !Ref FsxSg
+      LustreConfiguration:
+        DeploymentType: PERSISTENT_2
+        PerUnitStorageThroughput: !Ref FsxPerUnitStorageThroughput
+        DataCompressionType: LZ4
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-fsx
+
+  # ==================== IAM ====================
+  EksClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ResourceNamePrefix}-eks-cluster-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+  HyperPodIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ResourceNamePrefix}-hyperpod-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+        - arn:aws:iam::aws:policy/AmazonSageMakerClusterInstanceRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+  # ==================== S3 Bucket for Lifecycle ====================
+  LifecycleBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ResourceNamePrefix}-lifecycle-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ==================== EKS Cluster ====================
+  EksCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Sub ${ResourceNamePrefix}-eks
+      Version: !Ref KubernetesVersion
+      RoleArn: !GetAtt EksClusterRole.Arn
+      ResourcesVpcConfig:
+        SubnetIds:
+          - !Ref PublicSubnet1
+          - !Ref PublicSubnet2
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+        SecurityGroupIds:
+          - !Ref ClusterSg
+        EndpointPublicAccess: true
+        EndpointPrivateAccess: true
+      AccessConfig:
+        AuthenticationMode: API_AND_CONFIG_MAP
+        BootstrapClusterCreatorAdminPermissions: true
+
+  # ==================== HyperPod Cluster (accelerated group in LZ) ====================
+  HyperPodCluster:
+    Type: AWS::SageMaker::Cluster
+    DependsOn: EksCluster
+    Properties:
+      ClusterName: !Sub ${ResourceNamePrefix}-cluster
+      Orchestrator:
+        Eks:
+          ClusterArn: !GetAtt EksCluster.Arn
+      InstanceGroups:
+        - InstanceGroupName: accelerated-group
+          InstanceType: !Ref AcceleratedInstanceType
+          InstanceCount: !Ref AcceleratedInstanceCount
+          ExecutionRole: !GetAtt HyperPodIamRole.Arn
+          ThreadsPerCore: 1
+          InstanceStorageConfigs:
+            - EbsVolumeConfig:
+                VolumeSizeInGB: 500
+          LifeCycleConfig:
+            SourceS3Uri: !Sub s3://${LifecycleBucket}/lifecycle
+            OnCreate: on_create.sh
+          TrainingPlanArn: !If [HasTrainingPlan, !Ref TrainingPlanArn, !Ref AWS::NoValue]
+          OverrideVpcConfig:
+            SecurityGroupIds:
+              - !Ref ClusterSg
+            Subnets:
+              - !Ref LzSubnet
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref ClusterSg
+        Subnets:
+          - !Ref LzSubnet
+      NodeRecovery: Automatic
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+  LzSubnetId:
+    Value: !Ref LzSubnet
+  ParentAz2SubnetId:
+    Value: !Ref PublicSubnet2
+  SecurityGroupId:
+    Value: !Ref ClusterSg
+  EksClusterName:
+    Value: !Ref EksCluster
+  EksClusterArn:
+    Value: !GetAtt EksCluster.Arn
+  EksClusterEndpoint:
+    Value: !GetAtt EksCluster.Endpoint
+  HyperPodClusterName:
+    Value: !Ref HyperPodCluster
+  HyperPodClusterArn:
+    Value: !GetAtt HyperPodCluster.ClusterArn
+  FsxFileSystemId:
+    Value: !Ref FsxFileSystem
+  FsxDnsName:
+    Value: !GetAtt FsxFileSystem.DNSName
+  FsxMountName:
+    Value: !GetAtt FsxFileSystem.LustreMountName
+  LifecycleBucket:
+    Value: !Ref LifecycleBucket
+  HyperPodIamRoleArn:
+    Value: !GetAtt HyperPodIamRole.Arn

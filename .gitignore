@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.aws/
+*.pem
+*.key
+
+# CFN local artifacts
+outputs.json
+
+# Test logs (results/ is checked in intentionally)
+logs/
+smoke-tests/logs/
