@@ -39,6 +39,9 @@ export AWS_DEFAULT_REGION=us-west-2
 
 # 4. Create the HyperPod cluster attached to the EKS cluster
 TRAINING_PLAN_NAME=<your-ftp-name> ./create-hyperpod-cluster.sh
+
+# 5. (Optional) Run the DDP smoke test that exercises EFA + FSx end-to-end
+./run-ddp-smoke-test.sh apply
 ```
 
 Why 3 stages: the AWS reference CFN uses a Lambda-based helm installer that's currently broken (urllib3 v1 vs Python 3.12 stdlib mismatch — see `.local/context.md` in the parent repo). The AWS workshop's own "Manual HyperPod Cluster Creation" path uses the local `helm` CLI, which is simpler and works reliably.
@@ -57,11 +60,13 @@ Why 3 stages: the AWS reference CFN uses a Lambda-based helm installer that's cu
 - `install-helm.sh` — Stage 2: install HyperPod dependencies + aws-fsx-csi-driver via local helm CLI.
 - `create-fsx-pv.sh` — Stage 3: create static PV + PVC referencing the CFN-managed FSx.
 - `create-hyperpod-cluster.sh` — Stage 4: create the HyperPod cluster attached to EKS.
-- `manifests/nccl-2node-efa.yaml` — Working PyTorchJob for 2-node NCCL all-reduce over EFA (with the required hostNetwork/dshm/socket-ifname settings).
+- `run-ddp-smoke-test.sh` — Optional Stage 5: end-to-end DDP smoke test.
+- `manifests/ddp_train.py` — Multi-node DDP training script (used by the smoke test).
+- `manifests/ddp-dataset-prep-job.yaml` — One-shot Job that seeds synthetic dataset to FSx.
+- `manifests/ddp-train-job.yaml` — PyTorchJob for the DDP training run.
+- `manifests/nccl-2node-efa.yaml` — Working PyTorchJob for 2-node NCCL all-reduce over EFA.
 - `manifests/fsx-test-pod.yaml` — Simple pod that mounts /fsx and runs write/read timing test.
-- `results/nccl-2node-eks-efa.log` — Raw NCCL output from a working run (479 GB/s at 16 GB).
-- `results/nccl-2node-eks-tcp.log` — Earlier run with a non-DLC image showing TCP fallback (~3.2 GB/s) for comparison.
-- `results/fsx-mount-test.log` — FSx cross-zone mount test output.
+- `results/*.log` — Sample outputs from working runs.
 
 ## FSx Lustre configuration
 
@@ -112,10 +117,29 @@ Matches the Slurm variant of this repo to within 1% at 8-16 GB.
 
 Container: `763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47` (AWS Deep Learning Container with `aws-ofi-nccl` plugin baked in).
 
+**End-to-end DDP training with FSx-backed dataset and checkpoints:**
+
+A ~440M-param MLP trained on 2 nodes × 8 GPUs = 16 ranks, reading the dataset from FSx and writing per-epoch checkpoints back to FSx:
+
+- 5 epochs, 160 steps, 307 seconds
+- 266 samples/sec (small model on synthetic data; the point is to exercise the plumbing, not benchmark)
+- Rank 0 wrote 5 checkpoints (5.2 GB each) to `/fsx/ddp-smoke/ckpt/`
+- **Resume works**: re-running the same PyTorchJob detected the checkpoint, loaded state from FSx, and exited cleanly at the epoch we left off. This proves FSx durability across pod lifecycles and cross-node shared read.
+
 Sample manifests and logs in `results/`:
-- `nccl-efa-job.yaml` — the PyTorchJob spec that produced these numbers
+- `nccl-2node-efa.yaml` — 2-node NCCL benchmark PyTorchJob (in `manifests/`)
 - `nccl-2node-eks-efa.log` — raw NCCL output including topology and per-size busBw
 - `nccl-2node-eks-tcp.log` — earlier run with `nvcr.io/nvidia/pytorch:24.10-py3` for comparison. NCCL falls back to TCP-over-ENA (~3.2 GB/s at 16 GB) because that image lacks `aws-ofi-nccl`.
+- `ddp-train-run1.log` — full DDP training run
+- `ddp-train-run2-resume.log` — resume test showing checkpoint loaded from FSx
+- `fsx-mount-test.log` — FSx cross-zone mount + basic I/O test
+
+To run the DDP smoke test yourself:
+```bash
+./run-ddp-smoke-test.sh apply    # seeds dataset, applies training PyTorchJob
+./run-ddp-smoke-test.sh logs     # tail master log
+./run-ddp-smoke-test.sh reset    # wipe checkpoints, start fresh
+```
 
 ## Key pod-spec requirements for EFA on HyperPod EKS
 
