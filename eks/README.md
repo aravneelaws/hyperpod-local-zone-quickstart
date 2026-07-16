@@ -1,10 +1,58 @@
-# HyperPod EKS on AWS Local Zones — WORKING (validated end-to-end with full EFA multi-rail)
+# HyperPod EKS on AWS Local Zones — Quickstart
 
-Companion to the top-level Slurm variant. Deploys the same 2-node H200 topology, orchestrated by **EKS** instead of Slurm, in the Phoenix Local Zone (`us-west-2-phx-2a`).
+Deploys a HyperPod cluster orchestrated by **EKS** in an AWS Local Zone. Validated end-to-end with 2× `ml.p5e.48xlarge` (H200 × 8, 32 EFA interfaces) in Phoenix Local Zone (`us-west-2-phx-2a`) via SageMaker Flexible Training Plans (FTP).
 
-> **Status: fully validated.** VPC + EKS + helm dependencies + HyperPod cluster all deploy successfully. Nodes register as k8s nodes with `Schedulable` health status. Cross-node PyTorch training works. 2-node NCCL all-reduce hits **479 GB/s busBw at 16 GB** — matching the Slurm variant to within 1%. EFA multi-rail (32 rails) works with the right container + pod spec.
+> Looking for the **Slurm variant**? See [`../slurm/`](../slurm/).
+
+**Status:** VPC + EKS + helm dependencies + HyperPod cluster + FSx Lustre all deploy successfully. Nodes register as Kubernetes nodes with `Schedulable` health status. 2-node NCCL all-reduce hits **479 GB/s busBw at 16 GB** — matching the Slurm variant to within 1%. End-to-end DDP training with FSx-backed dataset + checkpoints validated including resume-from-checkpoint.
 
 ## Architecture
+
+```mermaid
+flowchart TB
+    subgraph vpc["VPC 10.44.0.0/16 + 10.45.0.0/16 (us-west-2)"]
+        direction TB
+
+        subgraph az1["Parent AZ us-west-2a"]
+            nat["NAT Gateway"]
+            eks1["EKS Control Plane ENI"]
+        end
+
+        subgraph az2["Parent AZ us-west-2b (LZ parent)"]
+            eks2["EKS Control Plane ENI"]
+            fsx[("FSx Lustre<br/>PERSISTENT_2, 1.2 TiB")]
+        end
+
+        subgraph lz["Local Zone us-west-2-phx-2a"]
+            w1["Worker 1<br/>ml.p5e.48xlarge<br/>(FTP-reserved)<br/>hyperpod-i-*"]
+            w2["Worker 2<br/>ml.p5e.48xlarge<br/>(FTP-reserved)<br/>hyperpod-i-*"]
+        end
+    end
+
+    eksapi>"EKS API<br/>(managed by AWS)"]
+    igw((IGW))
+
+    igw --- nat
+    eks1 --- eksapi
+    eks2 --- eksapi
+
+    w1 <-.->|"kubelet<br/>(control, cross-zone)"| eksapi
+    w2 <-.->|"kubelet<br/>(control, cross-zone)"| eksapi
+
+    w1 <==>|"NCCL over EFA<br/>32 rails, intra-LZ"| w2
+
+    w1 -->|FSx CSI mount<br/>cross-zone| fsx
+    w2 -->|FSx CSI mount<br/>cross-zone| fsx
+
+    nat -->|egress| lz
+
+    classDef zone fill:#f9f9f9,stroke:#999,stroke-width:1px
+    classDef ext fill:#eef7ff,stroke:#3388cc,stroke-width:1px
+    class az1,az2,lz zone
+    class eksapi ext
+```
+
+**Text summary:**
 
 ```
 VPC (10.44.0.0/16 primary + 10.45.0.0/16 secondary, us-west-2)
