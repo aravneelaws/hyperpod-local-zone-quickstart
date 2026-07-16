@@ -12,7 +12,7 @@ VPC (10.44.0.0/16 primary + 10.45.0.0/16 secondary, us-west-2)
 │   ├── public subnet     → NAT
 │   └── /28 subnet        → EKS control plane ENI
 ├── us-west-2b (parent AZ 2 = LZ's parent)
-│   ├── public subnet
+│   ├── public subnet     → FSx Lustre file system (cross-zone mounted from LZ)
 │   └── /28 subnet        → EKS control plane ENI (HA)
 └── us-west-2-phx-2a (Local Zone, secondary CIDR 10.45.0.0/24)
     └── worker subnet     → HyperPod accelerated instance group (ml.p5e.48xlarge x 2)
@@ -22,19 +22,22 @@ Key insight: **EKS control plane cannot create ENIs in a Local Zone**, so the co
 
 ## Deploy workflow
 
-Three stages, run in order:
+Four stages, run in order:
 
 ```bash
 export AWS_PROFILE=<your-profile>
 export AWS_DEFAULT_REGION=us-west-2
 
-# 1. Deploy infrastructure (~15 min: VPC, EKS, add-ons, IAM, S3)
+# 1. Deploy infrastructure (~15 min: VPC, EKS, add-ons, IAM, S3, FSx Lustre in parent AZ)
 ./deploy-eks.sh
 
-# 2. Install HyperPod helm dependencies (needs helm + kubectl locally)
+# 2. Install HyperPod helm dependencies + FSx CSI driver (needs helm + kubectl locally)
 ./install-helm.sh
 
-# 3. Create the HyperPod cluster attached to the EKS cluster
+# 3. Create static PV + PVC referencing the FSx file system
+./create-fsx-pv.sh
+
+# 4. Create the HyperPod cluster attached to the EKS cluster
 TRAINING_PLAN_NAME=<your-ftp-name> ./create-hyperpod-cluster.sh
 ```
 
@@ -49,13 +52,30 @@ Why 3 stages: the AWS reference CFN uses a Lambda-based helm installer that's cu
 
 ## Files
 
-- `hyperpod-eks-lz-stack.yaml` — CFN template. Creates VPC, subnets (parent AZ + LZ), EKS with add-ons, IAM, S3. Does NOT install helm charts or create HyperPod cluster.
+- `hyperpod-eks-lz-stack.yaml` — CFN template. Creates VPC, subnets (parent AZ + LZ), EKS with add-ons, IAM, S3, and FSx Lustre in the parent AZ. Does NOT install helm charts or create HyperPod cluster.
 - `deploy-eks.sh` — Stage 1: deploy the CFN stack.
-- `install-helm.sh` — Stage 2: install HyperPod dependencies via local helm CLI.
-- `create-hyperpod-cluster.sh` — Stage 3: create the HyperPod cluster attached to EKS.
+- `install-helm.sh` — Stage 2: install HyperPod dependencies + aws-fsx-csi-driver via local helm CLI.
+- `create-fsx-pv.sh` — Stage 3: create static PV + PVC referencing the CFN-managed FSx.
+- `create-hyperpod-cluster.sh` — Stage 4: create the HyperPod cluster attached to EKS.
+- `manifests/nccl-2node-efa.yaml` — Working PyTorchJob for 2-node NCCL all-reduce over EFA (with the required hostNetwork/dshm/socket-ifname settings).
+- `manifests/fsx-test-pod.yaml` — Simple pod that mounts /fsx and runs write/read timing test.
+- `results/nccl-2node-eks-efa.log` — Raw NCCL output from a working run (479 GB/s at 16 GB).
+- `results/nccl-2node-eks-tcp.log` — Earlier run with a non-DLC image showing TCP fallback (~3.2 GB/s) for comparison.
+- `results/fsx-mount-test.log` — FSx cross-zone mount test output.
+
+## FSx Lustre configuration
+
+- **Location:** parent AZ (`us-west-2b` for PHX LZ). FSx is not available in most LZs.
+- **Access from LZ workers:** cross-zone mount over the VPC. In-cluster mount address is `<parent-AZ-IP>@tcp:/<mount-name>` — HyperPod workers in the LZ subnet reach it directly.
+- **Access mode:** `ReadWriteMany`. Multiple pods across multiple nodes can mount concurrently.
+- **Provisioning:** static (we pre-create the file system in CFN and expose it as a fixed PV). Dynamic provisioning (creating a new FSx per PVC) is also supported by the CSI driver but not the common pattern for shared-training-datasets.
+- **Sample measurements** from the LZ (single-stream I/O on 1 GiB file):
+  - Write: ~83 MB/s (limited by single-stream fdatasync, cross-zone latency)
+  - Read: ~595 MB/s (exceeds nominal 300 MB/s throughput thanks to client-side caching)
+- **Recommendation:** put training data (streamed reads) on FSx; parallel access across ranks scales far higher than the single-stream numbers. Put per-node venv/software on `/opt/dlami/nvme/` (local NVMe), not FSx — pip install on FSx is dominated by small-file metadata operations.
 - `results/nccl-2node-eks-tcp.log` — Sample PyTorchJob output on 2 nodes × 8 GPUs. `~3.2 GB/s busBw` (TCP fallback, no aws-ofi-nccl in container).
 
-## Verification after Stage 3
+## Verification after all stages
 
 ```bash
 # HyperPod side
@@ -65,10 +85,16 @@ aws sagemaker list-cluster-nodes --cluster-name hp-eks-lz-cluster
 # Kubernetes side
 kubectl get nodes --show-labels
 # → 2 hyperpod-i-* nodes, label sagemaker.amazonaws.com/node-health-status=Schedulable
-kubectl get pods -A | grep -E "hyperpod|health|efa|nvidia"
-# → all DaemonSets 1/1 Running per node
+kubectl get pods -A | grep -E "hyperpod|health|efa|nvidia|fsx"
+# → all DaemonSets 1/1 Running per node, fsx-csi-node + fsx-csi-controller running
 kubectl describe node hyperpod-i-<id> | grep -E "nvidia.com/gpu|vpc.amazonaws.com/efa"
 # → nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32
+kubectl get pv,pvc
+# → fsx-lustre-pv (1200Gi RWX Bound), fsx-lustre-pvc Bound
+
+# Quick FSx mount test
+kubectl apply -f manifests/fsx-test-pod.yaml
+kubectl logs fsx-test
 ```
 
 ## Test results

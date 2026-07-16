@@ -89,4 +89,29 @@ echo "--- kube-system HyperPod pieces ---"
 kubectl get ds -n kube-system 2>&1 | head -15
 
 echo ""
-echo "=== Done. Next: ./create-hyperpod-cluster.sh ==="
+echo "=== Done with hyperpod-dependencies. Next: FSx CSI driver ==="
+echo ""
+
+# ---------- Install aws-fsx-csi-driver ----------
+# The HyperPod helm chart does NOT include FSx CSI. Install it separately
+# so pods can mount the FSx Lustre file system provisioned by the CFN stack.
+echo "=== Adding aws-fsx-csi-driver helm repo ==="
+helm repo add aws-fsx-csi-driver https://kubernetes-sigs.github.io/aws-fsx-csi-driver >/dev/null 2>&1 || true
+helm repo update >/dev/null 2>&1
+
+echo ""
+echo "=== helm upgrade --install aws-fsx-csi-driver ==="
+helm upgrade --install aws-fsx-csi-driver aws-fsx-csi-driver/aws-fsx-csi-driver \
+  --namespace kube-system \
+  --wait \
+  --timeout 5m
+
+echo ""
+echo "=== Verify FSx CSI driver ==="
+kubectl get csidrivers 2>&1 | grep -E "NAME|fsx"
+kubectl get pods -n kube-system 2>&1 | grep fsx
+
+echo ""
+echo "=== Done. Next steps: ==="
+echo "  1. Apply the static FSx PV/PVC: ./create-fsx-pv.sh (auto-generated from stack outputs)"
+echo "  2. Create the HyperPod cluster: ./create-hyperpod-cluster.sh"

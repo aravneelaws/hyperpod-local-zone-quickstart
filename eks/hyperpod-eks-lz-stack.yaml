@@ -51,6 +51,28 @@ Parameters:
     Default: '1.33'
     AllowedValues: ['1.30', '1.31', '1.32', '1.33', '1.34', '1.35']
 
+  # FSx Lustre parameters. FSx isn't available in most Local Zones, so we place
+  # the filesystem in the LZ's parent AZ and cross-zone mount from LZ workers.
+  # A few ms of extra latency; acceptable for shared datasets/checkpoints.
+  CreateFsx:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Whether to provision an FSx Lustre file system in the parent AZ.
+  FsxStorageCapacityGiB:
+    Type: Number
+    Default: 1200
+    MinValue: 1200
+    Description: FSx Lustre capacity in GiB (min 1200 for PERSISTENT_2).
+  FsxPerUnitStorageThroughput:
+    Type: Number
+    Default: 250
+    AllowedValues: [125, 250, 500, 1000]
+    Description: FSx Lustre throughput per TiB (MB/s per TiB).
+
+Conditions:
+  ShouldCreateFsx: !Equals [!Ref CreateFsx, 'true']
+
 Mappings:
   # For us-west-2 the LZ parent is us-west-2b. We put EKS control-plane
   # subnets in this parent AZ + one other standard AZ (us-west-2a).
@@ -365,6 +387,151 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  # ==================== FSx Lustre (parent AZ, cross-zone mounted from LZ) ====================
+  # FSx is not offered in most Local Zones. We place the file system in the LZ's parent AZ
+  # (us-west-2b for PHX LZ) and mount it from LZ workers over the VPC's cross-zone link.
+  # Expected latency overhead vs. same-AZ FSx: ~1-5 ms per syscall. Fine for streamed reads.
+
+  FsxSg:
+    Type: AWS::EC2::SecurityGroup
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupDescription: FSx Lustre - Lustre client control (988) + data (1018-1023)
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-fsx-sg
+
+  # FSx Lustre requires bidirectional rules between the cluster SG and the FSx SG,
+  # plus self-referential rules on the FSx SG for LNET peer communication.
+  FsxSgIngressFromClusterCtl:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      SourceSecurityGroupId: !Ref ClusterSg
+      Description: Lustre client control from cluster
+
+  FsxSgIngressFromClusterData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      SourceSecurityGroupId: !Ref ClusterSg
+      Description: Lustre data from cluster
+
+  FsxSgIngressSelf988:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      SourceSecurityGroupId: !Ref FsxSg
+      Description: LNET peer
+
+  FsxSgIngressSelfData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      SourceSecurityGroupId: !Ref FsxSg
+      Description: Lustre data peer
+
+  FsxSgEgressToCluster988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref ClusterSg
+      Description: LNET to cluster clients
+
+  FsxSgEgressToClusterData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref ClusterSg
+      Description: Lustre data to cluster clients
+
+  FsxSgEgressSelf988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  FsxSgEgressSelfData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  # Cluster SG needs explicit egress to FSx SG for Lustre ports. The blanket
+  # egress-to-0.0.0.0/0 rule technically covers this, but adding SG-specific
+  # rules is clearer and future-proofs against tightening egress.
+  ClusterSgEgressFsx988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  ClusterSgEgressFsxData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  FsxFileSystem:
+    Type: AWS::FSx::FileSystem
+    Condition: ShouldCreateFsx
+    Properties:
+      FileSystemType: LUSTRE
+      StorageCapacity: !Ref FsxStorageCapacityGiB
+      # FSx lives in the parent AZ (us-west-2b), NOT the LZ. Workers cross-zone mount.
+      SubnetIds:
+        - !Ref PublicSubnet2
+      SecurityGroupIds:
+        - !Ref FsxSg
+      LustreConfiguration:
+        DeploymentType: PERSISTENT_2
+        PerUnitStorageThroughput: !Ref FsxPerUnitStorageThroughput
+        DataCompressionType: LZ4
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-fsx
+
   # ==================== EKS Cluster + Add-ons ====================
   EksCluster:
     Type: AWS::EKS::Cluster
@@ -448,6 +615,24 @@ Outputs:
     Value: !Ref LifecycleBucket
     Export:
       Name: !Sub ${AWS::StackName}-LifecycleBucket
+  FsxFileSystemId:
+    Condition: ShouldCreateFsx
+    Value: !Ref FsxFileSystem
+    Description: FSx Lustre file system ID (in the parent AZ)
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxFileSystemId
+  FsxDnsName:
+    Condition: ShouldCreateFsx
+    Value: !GetAtt FsxFileSystem.DNSName
+    Description: FSx Lustre DNS name (used by the k8s PersistentVolume)
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxDnsName
+  FsxMountName:
+    Condition: ShouldCreateFsx
+    Value: !GetAtt FsxFileSystem.LustreMountName
+    Description: FSx Lustre mount name (needed for mount command / PersistentVolume)
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxMountName
   KubeconfigCommand:
     Value: !Sub aws eks update-kubeconfig --name ${EksCluster} --region ${AWS::Region}
     Description: Run this locally to configure kubectl for this cluster
