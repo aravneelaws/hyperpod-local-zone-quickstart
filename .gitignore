@@ -23,6 +23,9 @@ venv/
 # CFN local artifacts
 outputs.json
 
+# Local-only session context (never committed)
+.local/
+
 # Test logs (results/ is checked in intentionally)
 logs/
 smoke-tests/logs/
