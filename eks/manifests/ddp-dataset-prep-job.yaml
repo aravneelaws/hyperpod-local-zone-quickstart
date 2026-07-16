@@ -1,0 +1,54 @@
+# One-shot Job that seeds a synthetic dataset onto FSx Lustre.
+# Runs on ONE node; writes ~4 GiB of tensors that all 16 training ranks will
+# read from concurrently during the DDP smoke test.
+#
+# Apply:  kubectl apply -f ddp-dataset-prep-job.yaml
+# Wait:   kubectl wait --for=condition=complete --timeout=10m job/ddp-dataset-prep
+# Logs:   kubectl logs -l app=ddp-dataset-prep
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ddp-dataset-prep
+  namespace: default
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels: {app: ddp-dataset-prep}
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        sagemaker.amazonaws.com/instance-group-name: accelerated
+      containers:
+        - name: prep
+          image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -ex
+              mkdir -p /fsx/ddp-smoke/dataset /fsx/ddp-smoke/ckpt
+              python - <<'PY'
+              import torch, time
+              from pathlib import Path
+              path = Path("/fsx/ddp-smoke/dataset/synthetic.pt")
+              if path.exists():
+                  print(f"Dataset already exists at {path} ({path.stat().st_size / 1e9:.2f} GB). Skipping.")
+              else:
+                  # 16384 samples x 4096 features x fp32 = ~4 GiB total
+                  n = 16384
+                  print(f"Generating {n} samples of (4096,) fp32 tensors...")
+                  t0 = time.time()
+                  x = torch.randn(n, 4096, dtype=torch.float32)
+                  y = torch.randn(n, 4096, dtype=torch.float32)
+                  torch.save({"x": x, "y": y}, path)
+                  print(f"Wrote {path} in {time.time()-t0:.1f}s "
+                        f"({path.stat().st_size / 1e9:.2f} GB)")
+              PY
+              ls -la /fsx/ddp-smoke/dataset/
+          volumeMounts:
+            - name: fsx
+              mountPath: /fsx
+      volumes:
+        - name: fsx
+          persistentVolumeClaim:
+            claimName: fsx-lustre-pvc

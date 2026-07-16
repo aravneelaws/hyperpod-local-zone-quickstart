@@ -1,0 +1,44 @@
+# Sample: pod that mounts FSx Lustre at /fsx
+#
+# Prereqs:
+#   - CFN stack created FSx (CreateFsx=true, default)
+#   - install-helm.sh installed the FSx CSI driver
+#   - create-fsx-pv.sh created the PV/PVC (fsx-lustre-pv / fsx-lustre-pvc)
+#
+# Apply:  kubectl apply -f fsx-test-pod.yaml
+# Logs:   kubectl logs fsx-test
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fsx-test
+  namespace: default
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    sagemaker.amazonaws.com/instance-group-name: accelerated
+  containers:
+    - name: test
+      image: public.ecr.aws/amazonlinux/amazonlinux:2023
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          set -ex
+          echo "=== mount check ==="
+          df -h /fsx
+          echo ""
+          echo "=== write 1 GiB ==="
+          time dd if=/dev/zero of=/fsx/test-$$ bs=1M count=1024 conv=fdatasync
+          ls -la /fsx/
+          echo ""
+          echo "=== read 1 GiB ==="
+          time dd if=/fsx/test-$$ of=/dev/null bs=1M
+          echo ""
+          echo "=== cleanup ==="
+          rm /fsx/test-$$
+      volumeMounts:
+        - name: fsx
+          mountPath: /fsx
+  volumes:
+    - name: fsx
+      persistentVolumeClaim:
+        claimName: fsx-lustre-pvc

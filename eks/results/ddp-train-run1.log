@@ -1,0 +1,66 @@
++ torchrun --nnodes=2 --node-rank=0 --nproc-per-node=8 --master-addr=nccl-ddp-train-master-0 --master-port=23456 /workspace/ddp_train.py
+W0716 19:40:01.176000 1 site-packages/torch/distributed/run.py:792] 
+W0716 19:40:01.176000 1 site-packages/torch/distributed/run.py:792] *****************************************
+W0716 19:40:01.176000 1 site-packages/torch/distributed/run.py:792] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0716 19:40:01.176000 1 site-packages/torch/distributed/run.py:792] *****************************************
+[W716 19:40:01.194933437 socket.cpp:759] [c10d] The IPv6 network addresses of (nccl-ddp-train-master-0, 23456) cannot be retrieved (gai error: -2 - Name or service not known).
+[rank6]:[W716 19:40:13.716788543 ProcessGroupNCCL.cpp:4561] [PG ID 0 PG GUID 0 Rank 6]  using GPU 6 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. Specify device_ids in barrier() to force use of a particular device, or call init_process_group() with a device_id.
+[rank 0] host=ip-172-18-142-143.us-west-2.compute.internal world_size=16 torch=2.6.0+cu126 cuda=12.6 nccl=(2, 23, 4) gpu=NVIDIA H200
+[rank5]:[W716 19:40:13.003643689 ProcessGroupNCCL.cpp:4561] [PG ID 0 PG GUID 0 Rank 5]  using GPU 5 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. Specify device_ids in barrier() to force use of a particular device, or call init_process_group() with a device_id.
+[rank3]:[W716 19:40:14.272482075 ProcessGroupNCCL.cpp:4561] [PG ID 0 PG GUID 0 Rank 3]  using GPU 3 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. Specify device_ids in barrier() to force use of a particular device, or call init_process_group() with a device_id.
+[rank0]:[W716 19:40:14.313605623 ProcessGroupNCCL.cpp:4561] [PG ID 0 PG GUID 0 Rank 0]  using GPU 0 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. Specify device_ids in barrier() to force use of a particular device, or call init_process_group() with a device_id.
+NCCL version 2.23.4+cuda12.6
+[rank4]:[W716 19:40:14.347621269 ProcessGroupNCCL.cpp:4561] [PG ID 0 PG GUID 0 Rank 4]  using GPU 4 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. Specify device_ids in barrier() to force use of a particular device, or call init_process_group() with a device_id.
+[rank1]:[W716 19:40:14.358354234 ProcessGroupNCCL.cpp:4561] [PG ID 0 PG GUID 0 Rank 1]  using GPU 1 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. Specify device_ids in barrier() to force use of a particular device, or call init_process_group() with a device_id.
+[rank2]:[W716 19:40:14.379354666 ProcessGroupNCCL.cpp:4561] [PG ID 0 PG GUID 0 Rank 2]  using GPU 2 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. Specify device_ids in barrier() to force use of a particular device, or call init_process_group() with a device_id.
+[rank7]:[W716 19:40:14.383418746 ProcessGroupNCCL.cpp:4561] [PG ID 0 PG GUID 0 Rank 7]  using GPU 7 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. Specify device_ids in barrier() to force use of a particular device, or call init_process_group() with a device_id.
+[rank 0] loading dataset from /fsx/ddp-smoke/dataset/synthetic.pt ...
+[rank 0] dataset loaded: 16384 samples in 6.5s
+[rank 0] starting fresh (no checkpoint in /fsx/ddp-smoke/ckpt)
+[rank 0] epoch 0 step 0 loss=1.0030 cumulative_time=1.8s
+[rank 0] epoch 0 step 5 loss=0.9970 cumulative_time=2.0s
+[rank 0] epoch 0 step 10 loss=1.0027 cumulative_time=2.1s
+[rank 0] epoch 0 step 15 loss=0.9902 cumulative_time=2.3s
+[rank 0] epoch 0 step 20 loss=1.0029 cumulative_time=2.4s
+[rank 0] epoch 0 step 25 loss=0.9988 cumulative_time=2.6s
+[rank 0] epoch 0 step 30 loss=0.9989 cumulative_time=2.7s
+[rank 0] epoch 0 took 62.9s, checkpoint saved in 60.00s
+[rank 0] epoch 1 step 0 loss=0.9954 cumulative_time=63.3s
+[rank 0] epoch 1 step 5 loss=0.9946 cumulative_time=63.5s
+[rank 0] epoch 1 step 10 loss=0.9979 cumulative_time=63.6s
+[rank 0] epoch 1 step 15 loss=0.9913 cumulative_time=63.8s
+[rank 0] epoch 1 step 20 loss=0.9977 cumulative_time=63.9s
+[rank 0] epoch 1 step 25 loss=1.0015 cumulative_time=64.1s
+[rank 0] epoch 1 step 30 loss=0.9961 cumulative_time=64.2s
+[rank 0] epoch 1 took 61.2s, checkpoint saved in 59.72s
+[rank 0] epoch 2 step 0 loss=1.0035 cumulative_time=124.5s
+[rank 0] epoch 2 step 5 loss=0.9972 cumulative_time=124.6s
+[rank 0] epoch 2 step 10 loss=0.9993 cumulative_time=124.8s
+[rank 0] epoch 2 step 15 loss=1.0031 cumulative_time=124.9s
+[rank 0] epoch 2 step 20 loss=1.0038 cumulative_time=125.1s
+[rank 0] epoch 2 step 25 loss=1.0015 cumulative_time=125.2s
+[rank 0] epoch 2 step 30 loss=1.0034 cumulative_time=125.4s
+[rank 0] epoch 2 took 61.3s, checkpoint saved in 59.87s
+[rank 0] epoch 3 step 0 loss=0.9985 cumulative_time=185.8s
+[rank 0] epoch 3 step 5 loss=1.0035 cumulative_time=186.0s
+[rank 0] epoch 3 step 10 loss=0.9942 cumulative_time=186.1s
+[rank 0] epoch 3 step 15 loss=1.0003 cumulative_time=186.3s
+[rank 0] epoch 3 step 20 loss=1.0024 cumulative_time=186.4s
+[rank 0] epoch 3 step 25 loss=0.9987 cumulative_time=186.6s
+[rank 0] epoch 3 step 30 loss=1.0029 cumulative_time=186.7s
+[rank 0] epoch 3 took 61.0s, checkpoint saved in 59.55s
+[rank 0] epoch 4 step 0 loss=0.9966 cumulative_time=246.8s
+[rank 0] epoch 4 step 5 loss=1.0044 cumulative_time=247.0s
+[rank 0] epoch 4 step 10 loss=1.0051 cumulative_time=247.1s
+[rank 0] epoch 4 step 15 loss=0.9971 cumulative_time=247.3s
+[rank 0] epoch 4 step 20 loss=1.0015 cumulative_time=247.4s
+[rank 0] epoch 4 step 25 loss=1.0015 cumulative_time=247.6s
+[rank 0] epoch 4 step 30 loss=1.0017 cumulative_time=247.7s
+[rank 0] epoch 4 took 61.4s, checkpoint saved in 59.92s
+[rank 0] SUCCESS: 160 steps across 5 epochs in 307.8s (266.2 samples/sec across 16 GPUs)
+[rank 0] checkpoints in /fsx/ddp-smoke/ckpt:
+           epoch-1.pt  (5235.8 MB)
+           epoch-2.pt  (5235.8 MB)
+           epoch-3.pt  (5235.8 MB)
+           epoch-4.pt  (5235.8 MB)
+           epoch-5.pt  (5235.8 MB)

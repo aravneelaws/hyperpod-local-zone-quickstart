@@ -2,22 +2,22 @@
 
 Amazon SageMaker HyperPod for GPU training clusters running in AWS Local Zones. Validated end-to-end with `ml.p5e.48xlarge` (H200 × 8, 32 EFA interfaces) in Phoenix Local Zone (`us-west-2-phx-2a`) via SageMaker Flexible Training Plans (FTP).
 
-Two orchestrator variants: **Slurm** and **EKS**. Both share the same architectural pattern (EFA workers in the LZ, FSx Lustre in the parent AZ, cross-zone mounted).
+Two orchestrator variants, both validated end-to-end: **Slurm** and **EKS**. Both share the same architectural pattern (EFA workers in the LZ, FSx Lustre in the parent AZ, cross-zone mounted).
 
 Everything you need to reproduce the deployment lives in this repo: CloudFormation templates, deploy scripts, smoke tests, and sample results from a working run.
 
 ## Variants
 
-| | [Slurm](slurm/) | EKS |
+| | [Slurm](slurm/) | [EKS](eks/) |
 |---|---|---|
-| **Status** | Validated end-to-end | Coming in a follow-up (see [`eks/`](eks/) for the in-progress placeholder) |
 | **Orchestrator** | Slurm on a dedicated controller instance | Amazon EKS (managed by AWS) |
 | **Best for** | HPC-style workloads, `sbatch` habits, minimal moving parts | Kubernetes teams, container-native workflows |
 | **Deploy steps** | 3 shell scripts | 4 shell scripts + optional smoke test |
 | **Job submission** | `sbatch` sbatch files | `kubectl apply -f` (Kubeflow PyTorchJob) |
 | **Node access** | SSH via SSM | `kubectl exec` |
 | **FSx Lustre** | Yes, in parent AZ, cross-zone mount | Yes, in parent AZ, cross-zone mount |
-| **Validated 2-node NCCL busBw @ 16 GB** | **484 GB/s** | 479 GB/s (in progress) |
+| **Validated 2-node NCCL busBw @ 16 GB** | **484 GB/s** | **479 GB/s** |
+| **DDP training validated** | Yes (see [slurm/README.md](slurm/README.md#test-results-h200-p5e48xlarge-in-phoenix-local-zone)) | Yes, including checkpoint resume (see [eks/README.md](eks/README.md#test-results)) |
 | **Docs** | [`slurm/README.md`](slurm/README.md) | [`eks/README.md`](eks/README.md) |
 
 ## How to pick
@@ -54,11 +54,10 @@ The **EKS variant** doesn't hit this issue because the EKS control plane is mana
 ├── LICENSE            ← MIT-0
 ├── slurm/             ← Slurm variant (CFN + scripts + smoke tests + sample results)
 │   └── README.md
-└── eks/               ← EKS variant
+└── eks/               ← EKS variant (CFN + scripts + manifests + sample results)
     └── README.md
 ```
 
 ## License
 
 MIT-0 — see [LICENSE](LICENSE).
-

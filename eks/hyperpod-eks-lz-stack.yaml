@@ -1,69 +1,64 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  HyperPod EKS cluster in an AWS Local Zone.
-  Creates VPC with 2 parent-AZ subnets (EKS control plane) + 1 LZ subnet (HyperPod worker instance group).
-  Also creates EKS cluster, HyperPod cluster, FSx Lustre in parent AZ, and required IAM/SG.
-  Tested with p5e.48xlarge in Phoenix Local Zone (us-west-2-phx-2a).
+  Infrastructure-only stack for HyperPod EKS in an AWS Local Zone.
+  Deploys VPC, subnets (parent AZ + Local Zone), EKS cluster with core add-ons,
+  IAM role for HyperPod, and S3 bucket for lifecycle scripts.
+
+  Does NOT install helm charts and does NOT create the SageMaker HyperPod cluster.
+  Those two steps are done post-deploy by the companion scripts:
+    ./install-helm.sh           - installs the HyperPod dependency helm chart
+    ./create-hyperpod-cluster.sh - creates the AWS::SageMaker::Cluster resource
+
+  This split follows the AWS reference workshop's "Manual HyperPod Cluster Creation"
+  path, which is more robust than the Lambda-based helm installer in the reference CFN.
 
 Parameters:
   ResourceNamePrefix:
     Type: String
-    Default: hyperpod-eks-lz
-    Description: Prefix for named resources.
+    Default: hp-eks-lz
+    AllowedPattern: '^[a-z][a-z0-9-]{2,20}$'
   VpcCidr:
     Type: String
     Default: 10.44.0.0/16
-    Description: VPC CIDR (must NOT overlap with the Slurm stack CIDR 10.42.0.0/16).
-  ParentAz1:
-    Type: String
-    Default: us-west-2a
-    Description: First parent AZ for EKS control plane HA.
-  ParentAz2:
-    Type: String
-    Default: us-west-2b
-    Description: Second parent AZ (must be the LZ's parent AZ).
-  LocalZone:
-    Type: String
-    Default: us-west-2-phx-2a
-    Description: Local Zone for HyperPod worker instance group.
-  ParentAz1SubnetCidr:
+  PublicSubnet1Cidr:
     Type: String
     Default: 10.44.10.0/24
-    Description: Parent AZ 1 public subnet CIDR.
-  ParentAz2SubnetCidr:
+  PublicSubnet2Cidr:
     Type: String
     Default: 10.44.11.0/24
-    Description: Parent AZ 2 public subnet CIDR.
-  ParentAz1PrivateSubnetCidr:
+  EksControlPlaneSubnet1Cidr:
     Type: String
-    Default: 10.44.20.0/24
-    Description: Parent AZ 1 private subnet CIDR (for EKS worker eth0).
-  ParentAz2PrivateSubnetCidr:
+    Default: 10.44.100.0/28
+  EksControlPlaneSubnet2Cidr:
     Type: String
-    Default: 10.44.21.0/24
-    Description: Parent AZ 2 private subnet CIDR (for EKS worker eth0).
-  LzSubnetCidr:
+    Default: 10.44.100.16/28
+  # Secondary CIDR block used exclusively for the worker subnet in the LZ.
+  WorkerSecondaryCidr:
     Type: String
-    Default: 10.44.30.0/24
-    Description: LZ subnet CIDR for HyperPod worker instance group.
+    Default: 10.45.0.0/16
+  WorkerSubnetCidr:
+    Type: String
+    Default: 10.45.0.0/24
+  LocalZoneId:
+    Type: String
+    Default: usw2-phx2-az1
+    AllowedPattern: '^[a-z]{3,4}[0-9](-[a-z0-9]+)?-az[0-9]$'
+    Description: >
+      AZ ID of the Local Zone where p5e workers live.
+      Examples: usw2-phx2-az1 (Phoenix), use1-bos-az1 (Boston).
   KubernetesVersion:
     Type: String
-    Default: "1.31"
-    Description: EKS Kubernetes version.
-  AcceleratedInstanceType:
+    Default: '1.33'
+    AllowedValues: ['1.30', '1.31', '1.32', '1.33', '1.34', '1.35']
+
+  # FSx Lustre parameters. FSx isn't available in most Local Zones, so we place
+  # the filesystem in the LZ's parent AZ and cross-zone mount from LZ workers.
+  # A few ms of extra latency; acceptable for shared datasets/checkpoints.
+  CreateFsx:
     Type: String
-    Default: ml.p5e.48xlarge
-    Description: Worker instance type (must be available in the LZ).
-  AcceleratedInstanceCount:
-    Type: Number
-    Default: 2
-    Description: Number of accelerated instances.
-  TrainingPlanArn:
-    Type: String
-    Default: ""
-    Description: >
-      Training plan ARN for the accelerated instance group. Leave empty to use on-demand.
-      Example: arn:aws:sagemaker:us-west-2:123456789012:training-plan/my-plan
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Whether to provision an FSx Lustre file system in the parent AZ.
   FsxStorageCapacityGiB:
     Type: Number
     Default: 1200
@@ -73,12 +68,22 @@ Parameters:
     Type: Number
     Default: 250
     AllowedValues: [125, 250, 500, 1000]
+    Description: FSx Lustre throughput per TiB (MB/s per TiB).
 
 Conditions:
-  HasTrainingPlan: !Not [!Equals [!Ref TrainingPlanArn, ""]]
+  ShouldCreateFsx: !Equals [!Ref CreateFsx, 'true']
+
+Mappings:
+  # For us-west-2 the LZ parent is us-west-2b. We put EKS control-plane
+  # subnets in this parent AZ + one other standard AZ (us-west-2a).
+  RegionAzs:
+    us-west-2:
+      StandardAz1: us-west-2a
+      StandardAz2: us-west-2b
 
 Resources:
-  # ==================== VPC ====================
+
+  # ==================== VPC + Subnets ====================
   Vpc:
     Type: AWS::EC2::VPC
     Properties:
@@ -88,6 +93,12 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${ResourceNamePrefix}-vpc
+
+  VpcSecondaryCidr:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref WorkerSecondaryCidr
 
   Igw:
     Type: AWS::EC2::InternetGateway
@@ -102,66 +113,67 @@ Resources:
       VpcId: !Ref Vpc
       InternetGatewayId: !Ref Igw
 
-  # ==================== Subnets ====================
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref ParentAz1SubnetCidr
-      AvailabilityZone: !Ref ParentAz1
+      CidrBlock: !Ref PublicSubnet1Cidr
+      AvailabilityZone: !FindInMap [RegionAzs, !Ref 'AWS::Region', StandardAz1]
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${ResourceNamePrefix}-public-${ParentAz1}
-        - Key: "kubernetes.io/role/elb"
-          Value: "1"
+          Value: !Sub ${ResourceNamePrefix}-public-az1
+        - Key: kubernetes.io/role/elb
+          Value: '1'
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref ParentAz2SubnetCidr
-      AvailabilityZone: !Ref ParentAz2
+      CidrBlock: !Ref PublicSubnet2Cidr
+      AvailabilityZone: !FindInMap [RegionAzs, !Ref 'AWS::Region', StandardAz2]
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${ResourceNamePrefix}-public-${ParentAz2}
-        - Key: "kubernetes.io/role/elb"
-          Value: "1"
+          Value: !Sub ${ResourceNamePrefix}-public-az2
+        - Key: kubernetes.io/role/elb
+          Value: '1'
 
-  PrivateSubnet1:
+  # Small /28 subnets dedicated to EKS control-plane ENIs (in standard AZs only).
+  EksSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref ParentAz1PrivateSubnetCidr
-      AvailabilityZone: !Ref ParentAz1
+      CidrBlock: !Ref EksControlPlaneSubnet1Cidr
+      AvailabilityZone: !FindInMap [RegionAzs, !Ref 'AWS::Region', StandardAz1]
       Tags:
         - Key: Name
-          Value: !Sub ${ResourceNamePrefix}-private-${ParentAz1}
-        - Key: "kubernetes.io/role/internal-elb"
-          Value: "1"
+          Value: !Sub ${ResourceNamePrefix}-eks-cp-az1
 
-  PrivateSubnet2:
+  EksSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref ParentAz2PrivateSubnetCidr
-      AvailabilityZone: !Ref ParentAz2
+      CidrBlock: !Ref EksControlPlaneSubnet2Cidr
+      AvailabilityZone: !FindInMap [RegionAzs, !Ref 'AWS::Region', StandardAz2]
       Tags:
         - Key: Name
-          Value: !Sub ${ResourceNamePrefix}-private-${ParentAz2}
-        - Key: "kubernetes.io/role/internal-elb"
-          Value: "1"
+          Value: !Sub ${ResourceNamePrefix}-eks-cp-az2
 
-  LzSubnet:
+  # Worker subnet in the Local Zone (uses AvailabilityZoneId, not zone name).
+  # NOTE: this is NOT passed to the EKS control plane - EKS cannot create ENIs
+  # in a Local Zone. HyperPod attaches its workers here via
+  # AWS::SageMaker::Cluster.VpcConfig.Subnets.
+  WorkerSubnet:
     Type: AWS::EC2::Subnet
+    DependsOn: VpcSecondaryCidr
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref LzSubnetCidr
-      AvailabilityZone: !Ref LocalZone
+      CidrBlock: !Ref WorkerSubnetCidr
+      AvailabilityZoneId: !Ref LocalZoneId
       Tags:
         - Key: Name
-          Value: !Sub ${ResourceNamePrefix}-lz-worker
+          Value: !Sub ${ResourceNamePrefix}-worker-lz
 
   # ==================== NAT + Routing ====================
   NatEip:
@@ -222,25 +234,25 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway
 
-  PrivateSubnet1Assoc:
+  EksSubnet1Assoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet1
+      SubnetId: !Ref EksSubnet1
       RouteTableId: !Ref PrivateRt
 
-  PrivateSubnet2Assoc:
+  EksSubnet2Assoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet2
+      SubnetId: !Ref EksSubnet2
       RouteTableId: !Ref PrivateRt
 
-  LzSubnetAssoc:
+  WorkerSubnetAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref LzSubnet
+      SubnetId: !Ref WorkerSubnet
       RouteTableId: !Ref PrivateRt
 
-  S3GatewayEndpoint:
+  S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref Vpc
@@ -251,10 +263,12 @@ Resources:
         - !Ref PrivateRt
 
   # ==================== Security Group ====================
+  # EFA-friendly: intra-SG all traffic, egress 0.0.0.0/0, FSx Lustre ports.
+  # Matches AWS reference architecture pattern.
   ClusterSg:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: EFA-friendly SG for HyperPod EKS cluster
+      GroupDescription: !Sub ${ResourceNamePrefix} EFA/HyperPod SG
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
@@ -281,119 +295,11 @@ Resources:
       IpProtocol: '-1'
       CidrIp: 0.0.0.0/0
 
-  # ==================== FSx Lustre (parent AZ) ====================
-  FsxSg:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: FSx Lustre SG
-      VpcId: !Ref Vpc
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 988
-          ToPort: 988
-          SourceSecurityGroupId: !Ref ClusterSg
-        - IpProtocol: tcp
-          FromPort: 1018
-          ToPort: 1023
-          SourceSecurityGroupId: !Ref ClusterSg
-      Tags:
-        - Key: Name
-          Value: !Sub ${ResourceNamePrefix}-fsx-sg
-
-  FsxSgIngressSelf988:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref FsxSg
-      IpProtocol: tcp
-      FromPort: 988
-      ToPort: 988
-      SourceSecurityGroupId: !Ref FsxSg
-
-  FsxSgIngressSelfData:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref FsxSg
-      IpProtocol: tcp
-      FromPort: 1018
-      ToPort: 1023
-      SourceSecurityGroupId: !Ref FsxSg
-
-  FsxSgEgressToCluster988:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref FsxSg
-      IpProtocol: tcp
-      FromPort: 988
-      ToPort: 988
-      DestinationSecurityGroupId: !Ref ClusterSg
-
-  FsxSgEgressToClusterData:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref FsxSg
-      IpProtocol: tcp
-      FromPort: 1018
-      ToPort: 1023
-      DestinationSecurityGroupId: !Ref ClusterSg
-
-  FsxSgEgressSelf988:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref FsxSg
-      IpProtocol: tcp
-      FromPort: 988
-      ToPort: 988
-      DestinationSecurityGroupId: !Ref FsxSg
-
-  FsxSgEgressSelfData:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref FsxSg
-      IpProtocol: tcp
-      FromPort: 1018
-      ToPort: 1023
-      DestinationSecurityGroupId: !Ref FsxSg
-
-  ClusterSgEgressFsx988:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref ClusterSg
-      IpProtocol: tcp
-      FromPort: 988
-      ToPort: 988
-      DestinationSecurityGroupId: !Ref FsxSg
-
-  ClusterSgEgressFsxData:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref ClusterSg
-      IpProtocol: tcp
-      FromPort: 1018
-      ToPort: 1023
-      DestinationSecurityGroupId: !Ref FsxSg
-
-  FsxFileSystem:
-    Type: AWS::FSx::FileSystem
-    Properties:
-      FileSystemType: LUSTRE
-      StorageCapacity: !Ref FsxStorageCapacityGiB
-      SubnetIds:
-        - !Ref PublicSubnet2  # parent AZ (us-west-2b, matches LZ's parent)
-      SecurityGroupIds:
-        - !Ref FsxSg
-      LustreConfiguration:
-        DeploymentType: PERSISTENT_2
-        PerUnitStorageThroughput: !Ref FsxPerUnitStorageThroughput
-        DataCompressionType: LZ4
-      Tags:
-        - Key: Name
-          Value: !Sub ${ResourceNamePrefix}-fsx
-
-  # ==================== IAM ====================
+  # ==================== IAM Roles ====================
   EksClusterRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ResourceNamePrefix}-eks-cluster-role
+      RoleName: !Sub ${ResourceNamePrefix}-eks-cluster-role-${AWS::Region}
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -404,10 +310,12 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
 
-  HyperPodIamRole:
+  # SageMaker HyperPod execution role.
+  # Same permission surface as the reference sagemaker-iam-role-stack.yaml.
+  HyperPodExecRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ResourceNamePrefix}-hyperpod-role
+      RoleName: !Sub ${ResourceNamePrefix}-hp-exec-role-${AWS::Region}
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -416,17 +324,59 @@ Resources:
               Service: sagemaker.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
         - arn:aws:iam::aws:policy/AmazonSageMakerClusterInstanceRolePolicy
-        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
         - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
-        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Policies:
+        - PolicyName: hp-extras
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AssignPrivateIpAddresses
+                  - ec2:CreateNetworkInterface
+                  - ec2:CreateNetworkInterfacePermission
+                  - ec2:DeleteNetworkInterface
+                  - ec2:DeleteNetworkInterfacePermission
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeVpcs
+                  - ec2:DetachNetworkInterface
+                  - ec2:ModifyNetworkInterfaceAttribute
+                  - ec2:UnassignPrivateIpAddresses
+                Resource: '*'
+              - Effect: Allow
+                Action: ec2:CreateTags
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'ec2:CreateAction': ['CreateNetworkInterface']
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetAuthorizationToken
+                  - ecr:GetDownloadUrlForLayer
+                Resource: '*'
+              - Effect: Allow
+                Action: eks-auth:AssumeRoleForPodIdentity
+                Resource: '*'
+              - Effect: Allow
+                Action: cloudwatch:DescribeAlarms
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt LifecycleBucket.Arn
+                  - !Sub ${LifecycleBucket.Arn}/*
 
-  # ==================== S3 Bucket for Lifecycle ====================
+  # ==================== S3 Bucket ====================
   LifecycleBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub ${ResourceNamePrefix}-lifecycle-${AWS::AccountId}
+      BucketName: !Sub ${ResourceNamePrefix}-lifecycle-${AWS::AccountId}-${AWS::Region}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -437,7 +387,152 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
-  # ==================== EKS Cluster ====================
+  # ==================== FSx Lustre (parent AZ, cross-zone mounted from LZ) ====================
+  # FSx is not offered in most Local Zones. We place the file system in the LZ's parent AZ
+  # (us-west-2b for PHX LZ) and mount it from LZ workers over the VPC's cross-zone link.
+  # Expected latency overhead vs. same-AZ FSx: ~1-5 ms per syscall. Fine for streamed reads.
+
+  FsxSg:
+    Type: AWS::EC2::SecurityGroup
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupDescription: FSx Lustre - Lustre client control (988) + data (1018-1023)
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-fsx-sg
+
+  # FSx Lustre requires bidirectional rules between the cluster SG and the FSx SG,
+  # plus self-referential rules on the FSx SG for LNET peer communication.
+  FsxSgIngressFromClusterCtl:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      SourceSecurityGroupId: !Ref ClusterSg
+      Description: Lustre client control from cluster
+
+  FsxSgIngressFromClusterData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      SourceSecurityGroupId: !Ref ClusterSg
+      Description: Lustre data from cluster
+
+  FsxSgIngressSelf988:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      SourceSecurityGroupId: !Ref FsxSg
+      Description: LNET peer
+
+  FsxSgIngressSelfData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      SourceSecurityGroupId: !Ref FsxSg
+      Description: Lustre data peer
+
+  FsxSgEgressToCluster988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref ClusterSg
+      Description: LNET to cluster clients
+
+  FsxSgEgressToClusterData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref ClusterSg
+      Description: Lustre data to cluster clients
+
+  FsxSgEgressSelf988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  FsxSgEgressSelfData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  # Cluster SG needs explicit egress to FSx SG for Lustre ports. The blanket
+  # egress-to-0.0.0.0/0 rule technically covers this, but adding SG-specific
+  # rules is clearer and future-proofs against tightening egress.
+  ClusterSgEgressFsx988:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  ClusterSgEgressFsxData:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: ShouldCreateFsx
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      DestinationSecurityGroupId: !Ref FsxSg
+
+  FsxFileSystem:
+    Type: AWS::FSx::FileSystem
+    Condition: ShouldCreateFsx
+    Properties:
+      FileSystemType: LUSTRE
+      StorageCapacity: !Ref FsxStorageCapacityGiB
+      # FSx lives in the parent AZ (us-west-2b), NOT the LZ. Workers cross-zone mount.
+      SubnetIds:
+        - !Ref PublicSubnet2
+      SecurityGroupIds:
+        - !Ref FsxSg
+      LustreConfiguration:
+        DeploymentType: PERSISTENT_2
+        PerUnitStorageThroughput: !Ref FsxPerUnitStorageThroughput
+        DataCompressionType: LZ4
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-fsx
+
+  # ==================== EKS Cluster + Add-ons ====================
   EksCluster:
     Type: AWS::EKS::Cluster
     Properties:
@@ -446,10 +541,8 @@ Resources:
       RoleArn: !GetAtt EksClusterRole.Arn
       ResourcesVpcConfig:
         SubnetIds:
-          - !Ref PublicSubnet1
-          - !Ref PublicSubnet2
-          - !Ref PrivateSubnet1
-          - !Ref PrivateSubnet2
+          - !Ref EksSubnet1
+          - !Ref EksSubnet2
         SecurityGroupIds:
           - !Ref ClusterSg
         EndpointPublicAccess: true
@@ -458,66 +551,88 @@ Resources:
         AuthenticationMode: API_AND_CONFIG_MAP
         BootstrapClusterCreatorAdminPermissions: true
 
-  # ==================== HyperPod Cluster (accelerated group in LZ) ====================
-  HyperPodCluster:
-    Type: AWS::SageMaker::Cluster
+  VpcCniAddon:
+    Type: AWS::EKS::Addon
     DependsOn: EksCluster
     Properties:
-      ClusterName: !Sub ${ResourceNamePrefix}-cluster
-      Orchestrator:
-        Eks:
-          ClusterArn: !GetAtt EksCluster.Arn
-      InstanceGroups:
-        - InstanceGroupName: accelerated-group
-          InstanceType: !Ref AcceleratedInstanceType
-          InstanceCount: !Ref AcceleratedInstanceCount
-          ExecutionRole: !GetAtt HyperPodIamRole.Arn
-          ThreadsPerCore: 1
-          InstanceStorageConfigs:
-            - EbsVolumeConfig:
-                VolumeSizeInGB: 500
-          LifeCycleConfig:
-            SourceS3Uri: !Sub s3://${LifecycleBucket}/lifecycle
-            OnCreate: on_create.sh
-          TrainingPlanArn: !If [HasTrainingPlan, !Ref TrainingPlanArn, !Ref AWS::NoValue]
-          OverrideVpcConfig:
-            SecurityGroupIds:
-              - !Ref ClusterSg
-            Subnets:
-              - !Ref LzSubnet
-      VpcConfig:
-        SecurityGroupIds:
-          - !Ref ClusterSg
-        Subnets:
-          - !Ref LzSubnet
-      NodeRecovery: Automatic
+      ClusterName: !Ref EksCluster
+      AddonName: vpc-cni
+      ResolveConflicts: OVERWRITE
+
+  KubeProxyAddon:
+    Type: AWS::EKS::Addon
+    DependsOn: EksCluster
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: kube-proxy
+      ResolveConflicts: OVERWRITE
+
+  CorednsAddon:
+    Type: AWS::EKS::Addon
+    DependsOn: [EksCluster, VpcCniAddon]
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: coredns
+      ResolveConflicts: OVERWRITE
+
+  PodIdentityAgentAddon:
+    Type: AWS::EKS::Addon
+    DependsOn: EksCluster
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: eks-pod-identity-agent
+      ResolveConflicts: OVERWRITE
 
 Outputs:
   VpcId:
     Value: !Ref Vpc
-  LzSubnetId:
-    Value: !Ref LzSubnet
-  ParentAz2SubnetId:
-    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub ${AWS::StackName}-VpcId
+  WorkerSubnetId:
+    Value: !Ref WorkerSubnet
+    Description: LZ worker subnet used by the HyperPod accelerated instance group
+    Export:
+      Name: !Sub ${AWS::StackName}-WorkerSubnetId
   SecurityGroupId:
     Value: !Ref ClusterSg
+    Export:
+      Name: !Sub ${AWS::StackName}-SecurityGroupId
   EksClusterName:
     Value: !Ref EksCluster
+    Export:
+      Name: !Sub ${AWS::StackName}-EksClusterName
   EksClusterArn:
     Value: !GetAtt EksCluster.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-EksClusterArn
   EksClusterEndpoint:
     Value: !GetAtt EksCluster.Endpoint
-  HyperPodClusterName:
-    Value: !Ref HyperPodCluster
-  HyperPodClusterArn:
-    Value: !GetAtt HyperPodCluster.ClusterArn
-  FsxFileSystemId:
-    Value: !Ref FsxFileSystem
-  FsxDnsName:
-    Value: !GetAtt FsxFileSystem.DNSName
-  FsxMountName:
-    Value: !GetAtt FsxFileSystem.LustreMountName
+  HyperPodExecRoleArn:
+    Value: !GetAtt HyperPodExecRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-HyperPodExecRoleArn
   LifecycleBucket:
     Value: !Ref LifecycleBucket
-  HyperPodIamRoleArn:
-    Value: !GetAtt HyperPodIamRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-LifecycleBucket
+  FsxFileSystemId:
+    Condition: ShouldCreateFsx
+    Value: !Ref FsxFileSystem
+    Description: FSx Lustre file system ID (in the parent AZ)
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxFileSystemId
+  FsxDnsName:
+    Condition: ShouldCreateFsx
+    Value: !GetAtt FsxFileSystem.DNSName
+    Description: FSx Lustre DNS name (used by the k8s PersistentVolume)
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxDnsName
+  FsxMountName:
+    Condition: ShouldCreateFsx
+    Value: !GetAtt FsxFileSystem.LustreMountName
+    Description: FSx Lustre mount name (needed for mount command / PersistentVolume)
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxMountName
+  KubeconfigCommand:
+    Value: !Sub aws eks update-kubeconfig --name ${EksCluster} --region ${AWS::Region}
+    Description: Run this locally to configure kubectl for this cluster

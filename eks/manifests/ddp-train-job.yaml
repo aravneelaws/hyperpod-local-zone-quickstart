@@ -1,0 +1,121 @@
+# Multi-node DDP smoke test on HyperPod EKS in AWS Local Zone.
+# Trains a ~440M-param MLP on 2 nodes x 8 GPUs = 16 ranks.
+# Reads dataset from FSx, writes checkpoints to FSx (rank 0).
+#
+# The training script (ddp_train.py) is mounted from a ConfigMap so we don't
+# have to embed Python in YAML.
+#
+# Prereqs:
+#   - Cluster deployed (deploy-eks.sh + install-helm.sh + create-fsx-pv.sh + create-hyperpod-cluster.sh)
+#   - ConfigMap created:   kubectl create configmap ddp-train-py --from-file=ddp_train.py=eks/manifests/ddp_train.py
+#   - Dataset seeded:      kubectl apply -f eks/manifests/ddp-dataset-prep-job.yaml
+#
+# Apply:  kubectl apply -f eks/manifests/ddp-train-job.yaml
+# Watch:  kubectl logs -f nccl-ddp-train-master-0
+#
+# Resume test: after the first run completes, delete + re-apply this job.
+# The training script sees checkpoints in /fsx/ddp-smoke/ckpt/ and resumes
+# from the last epoch.
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: nccl-ddp-train
+  namespace: default
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata: {labels: {app: nccl-ddp-train}}
+        spec:
+          nodeSelector:
+            sagemaker.amazonaws.com/instance-group-name: accelerated
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: fsx
+              persistentVolumeClaim:
+                claimName: fsx-lustre-pvc
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+            - name: train-script
+              configMap:
+                name: ddp-train-py
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+                - {name: EPOCHS, value: "5"}
+              volumeMounts:
+                - {name: fsx, mountPath: /fsx}
+                - {name: dshm, mountPath: /dev/shm}
+                - {name: train-script, mountPath: /workspace, readOnly: true}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/ddp_train.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata: {labels: {app: nccl-ddp-train}}
+        spec:
+          nodeSelector:
+            sagemaker.amazonaws.com/instance-group-name: accelerated
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: fsx
+              persistentVolumeClaim:
+                claimName: fsx-lustre-pvc
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+            - name: train-script
+              configMap:
+                name: ddp-train-py
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+                - {name: EPOCHS, value: "5"}
+              volumeMounts:
+                - {name: fsx, mountPath: /fsx}
+                - {name: dshm, mountPath: /dev/shm}
+                - {name: train-script, mountPath: /workspace, readOnly: true}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/ddp_train.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}

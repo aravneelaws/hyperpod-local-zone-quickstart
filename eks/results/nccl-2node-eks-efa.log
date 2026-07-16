@@ -1,0 +1,1255 @@
++ hostname
+ip-172-18-131-43.us-west-2.compute.internal
++ ip -o -4 addr
++ head
+1: lo    inet 127.0.0.1/8 scope host lo\       valid_lft forever preferred_lft forever
+3: enp106s0    inet 10.45.0.70/24 metric 200 brd 10.45.0.255 scope global dynamic enp106s0\       valid_lft 1808sec preferred_lft 1808sec
+36: veth_def_agent    inet 169.254.0.1/24 scope global veth_def_agent\       valid_lft forever preferred_lft forever
+37: pod-id-link0    inet 169.254.170.23/32 scope global pod-id-link0\       valid_lft forever preferred_lft forever
++ cat
++ torchrun --nnodes=2 --node-rank=0 --nproc-per-node=8 --master-addr=nccl-efa-master-0 --master-port=23456 /tmp/t.py
+W0716 13:15:33.375000 1 site-packages/torch/distributed/run.py:792] 
+W0716 13:15:33.375000 1 site-packages/torch/distributed/run.py:792] *****************************************
+W0716 13:15:33.375000 1 site-packages/torch/distributed/run.py:792] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0716 13:15:33.375000 1 site-packages/torch/distributed/run.py:792] *****************************************
+[rank 0] world=16 nccl=(2, 23, 4)
+ip-172-18-131-43:118:118 [0] NCCL INFO NCCL_SOCKET_IFNAME set by environment to ^lo,docker,veth,cni,pod-id-link,veth_def
+ip-172-18-131-43:118:118 [0] NCCL INFO Bootstrap : Using enp106s0:10.45.0.70<0>
+ip-172-18-131-43:118:118 [0] NCCL INFO cudaDriverVersion 13000
+ip-172-18-131-43:118:118 [0] NCCL INFO NCCL version 2.23.4+cuda12.6
+ip-172-18-131-43:122:122 [4] NCCL INFO cudaDriverVersion 13000
+ip-172-18-131-43:122:122 [4] NCCL INFO NCCL_SOCKET_IFNAME set by environment to ^lo,docker,veth,cni,pod-id-link,veth_def
+ip-172-18-131-43:122:122 [4] NCCL INFO Bootstrap : Using enp106s0:10.45.0.70<0>
+ip-172-18-131-43:122:122 [4] NCCL INFO NCCL version 2.23.4+cuda12.6
+ip-172-18-131-43:118:118 [0] NCCL INFO Comm config Blocking set to 1
+ip-172-18-131-43:122:122 [4] NCCL INFO Comm config Blocking set to 1
+ip-172-18-131-43:121:121 [3] NCCL INFO cudaDriverVersion 13000
+ip-172-18-131-43:121:121 [3] NCCL INFO NCCL_SOCKET_IFNAME set by environment to ^lo,docker,veth,cni,pod-id-link,veth_def
+ip-172-18-131-43:121:121 [3] NCCL INFO Bootstrap : Using enp106s0:10.45.0.70<0>
+ip-172-18-131-43:121:121 [3] NCCL INFO NCCL version 2.23.4+cuda12.6
+ip-172-18-131-43:121:121 [3] NCCL INFO Comm config Blocking set to 1
+ip-172-18-131-43:124:124 [6] NCCL INFO cudaDriverVersion 13000
+ip-172-18-131-43:124:124 [6] NCCL INFO NCCL_SOCKET_IFNAME set by environment to ^lo,docker,veth,cni,pod-id-link,veth_def
+ip-172-18-131-43:124:124 [6] NCCL INFO Bootstrap : Using enp106s0:10.45.0.70<0>
+ip-172-18-131-43:124:124 [6] NCCL INFO NCCL version 2.23.4+cuda12.6
+ip-172-18-131-43:124:124 [6] NCCL INFO Comm config Blocking set to 1
+ip-172-18-131-43:125:125 [7] NCCL INFO cudaDriverVersion 13000
+ip-172-18-131-43:125:125 [7] NCCL INFO NCCL_SOCKET_IFNAME set by environment to ^lo,docker,veth,cni,pod-id-link,veth_def
+ip-172-18-131-43:125:125 [7] NCCL INFO Bootstrap : Using enp106s0:10.45.0.70<0>
+ip-172-18-131-43:125:125 [7] NCCL INFO NCCL version 2.23.4+cuda12.6
+ip-172-18-131-43:123:123 [5] NCCL INFO cudaDriverVersion 13000
+ip-172-18-131-43:123:123 [5] NCCL INFO NCCL_SOCKET_IFNAME set by environment to ^lo,docker,veth,cni,pod-id-link,veth_def
+ip-172-18-131-43:119:119 [1] NCCL INFO cudaDriverVersion 13000
+ip-172-18-131-43:119:119 [1] NCCL INFO NCCL_SOCKET_IFNAME set by environment to ^lo,docker,veth,cni,pod-id-link,veth_def
+ip-172-18-131-43:125:125 [7] NCCL INFO Comm config Blocking set to 1
+ip-172-18-131-43:123:123 [5] NCCL INFO Bootstrap : Using enp106s0:10.45.0.70<0>
+ip-172-18-131-43:123:123 [5] NCCL INFO NCCL version 2.23.4+cuda12.6
+ip-172-18-131-43:119:119 [1] NCCL INFO Bootstrap : Using enp106s0:10.45.0.70<0>
+ip-172-18-131-43:119:119 [1] NCCL INFO NCCL version 2.23.4+cuda12.6
+ip-172-18-131-43:123:123 [5] NCCL INFO Comm config Blocking set to 1
+ip-172-18-131-43:119:119 [1] NCCL INFO Comm config Blocking set to 1
+ip-172-18-131-43:120:120 [2] NCCL INFO cudaDriverVersion 13000
+ip-172-18-131-43:120:120 [2] NCCL INFO NCCL_SOCKET_IFNAME set by environment to ^lo,docker,veth,cni,pod-id-link,veth_def
+ip-172-18-131-43:120:120 [2] NCCL INFO Bootstrap : Using enp106s0:10.45.0.70<0>
+ip-172-18-131-43:120:120 [2] NCCL INFO NCCL version 2.23.4+cuda12.6
+ip-172-18-131-43:120:120 [2] NCCL INFO Comm config Blocking set to 1
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin_v8 symbol.
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin symbol (>= v5). ncclCollNetPlugin symbols v4 and lower are not supported.
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Initializing aws-ofi-nccl 1.13.2-aws
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Using Libfabric version 1.22
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Using CUDA driver version 13000 with runtime 12060
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Configuring AWS-specific options
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Setting FI_EFA_FORK_SAFE environment variable to 1
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Setting NCCL_NET_FORCE_FLUSH=0 for Hopper GPUs
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Setting NCCL_NVLSTREE_MAX_CHUNKSIZE to 512KiB
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Setting NCCL_NVLS_CHUNKSIZE to 512KiB
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Internode latency set at 75.0 us
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Using transport protocol RDMA (platform set)
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin_v8 symbol.
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin symbol (>= v5). ncclCollNetPlugin symbols v4 and lower are not supported.
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Initializing aws-ofi-nccl 1.13.2-aws
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Using Libfabric version 1.22
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Using CUDA driver version 13000 with runtime 12060
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Configuring AWS-specific options
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Setting FI_EFA_FORK_SAFE environment variable to 1
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Setting NCCL_NET_FORCE_FLUSH=0 for Hopper GPUs
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Setting NCCL_NVLSTREE_MAX_CHUNKSIZE to 512KiB
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Setting NCCL_NVLS_CHUNKSIZE to 512KiB
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Internode latency set at 75.0 us
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Using transport protocol RDMA (platform set)
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin_v8 symbol.
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin symbol (>= v5). ncclCollNetPlugin symbols v4 and lower are not supported.
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Initializing aws-ofi-nccl 1.13.2-aws
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Using Libfabric version 1.22
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Using CUDA driver version 13000 with runtime 12060
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Configuring AWS-specific options
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Setting FI_EFA_FORK_SAFE environment variable to 1
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Setting NCCL_NET_FORCE_FLUSH=0 for Hopper GPUs
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Setting NCCL_NVLSTREE_MAX_CHUNKSIZE to 512KiB
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Setting NCCL_NVLS_CHUNKSIZE to 512KiB
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Internode latency set at 75.0 us
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Using transport protocol RDMA (platform set)
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Selected Provider is efa (found 32 nics)
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Selected Provider is efa (found 32 nics)
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Selected Provider is efa (found 32 nics)
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin_v8 symbol.
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin symbol (>= v5). ncclCollNetPlugin symbols v4 and lower are not supported.
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Initializing aws-ofi-nccl 1.13.2-aws
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Using Libfabric version 1.22
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Using CUDA driver version 13000 with runtime 12060
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Configuring AWS-specific options
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Setting FI_EFA_FORK_SAFE environment variable to 1
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Setting NCCL_NET_FORCE_FLUSH=0 for Hopper GPUs
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Setting NCCL_NVLSTREE_MAX_CHUNKSIZE to 512KiB
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Setting NCCL_NVLS_CHUNKSIZE to 512KiB
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Internode latency set at 75.0 us
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Using transport protocol RDMA (platform set)
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin_v8 symbol.
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin symbol (>= v5). ncclCollNetPlugin symbols v4 and lower are not supported.
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Initializing aws-ofi-nccl 1.13.2-aws
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Using Libfabric version 1.22
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Using CUDA driver version 13000 with runtime 12060
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Configuring AWS-specific options
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin_v8 symbol.
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin symbol (>= v5). ncclCollNetPlugin symbols v4 and lower are not supported.
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Setting FI_EFA_FORK_SAFE environment variable to 1
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Initializing aws-ofi-nccl 1.13.2-aws
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Using Libfabric version 1.22
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Setting NCCL_NET_FORCE_FLUSH=0 for Hopper GPUs
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Using CUDA driver version 13000 with runtime 12060
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Setting NCCL_NVLSTREE_MAX_CHUNKSIZE to 512KiB
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Setting NCCL_NVLS_CHUNKSIZE to 512KiB
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Internode latency set at 75.0 us
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Configuring AWS-specific options
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Using transport protocol RDMA (platform set)
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Setting FI_EFA_FORK_SAFE environment variable to 1
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Setting NCCL_NET_FORCE_FLUSH=0 for Hopper GPUs
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Setting NCCL_NVLSTREE_MAX_CHUNKSIZE to 512KiB
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Setting NCCL_NVLS_CHUNKSIZE to 512KiB
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Internode latency set at 75.0 us
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Using transport protocol RDMA (platform set)
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin_v8 symbol.
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin symbol (>= v5). ncclCollNetPlugin symbols v4 and lower are not supported.
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Initializing aws-ofi-nccl 1.13.2-aws
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Using Libfabric version 1.22
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Using CUDA driver version 13000 with runtime 12060
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Configuring AWS-specific options
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Setting FI_EFA_FORK_SAFE environment variable to 1
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Setting NCCL_NET_FORCE_FLUSH=0 for Hopper GPUs
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Setting NCCL_NVLSTREE_MAX_CHUNKSIZE to 512KiB
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Setting NCCL_NVLS_CHUNKSIZE to 512KiB
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Internode latency set at 75.0 us
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Using transport protocol RDMA (platform set)
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin_v8 symbol.
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/Plugin: Failed to find ncclCollNetPlugin symbol (>= v5). ncclCollNetPlugin symbols v4 and lower are not supported.
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Initializing aws-ofi-nccl 1.13.2-aws
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Using Libfabric version 1.22
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Using CUDA driver version 13000 with runtime 12060
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Configuring AWS-specific options
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Setting FI_EFA_FORK_SAFE environment variable to 1
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Setting NCCL_NET_FORCE_FLUSH=0 for Hopper GPUs
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Setting NCCL_NVLSTREE_MAX_CHUNKSIZE to 512KiB
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Setting NCCL_NVLS_CHUNKSIZE to 512KiB
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Internode latency set at 75.0 us
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Using transport protocol RDMA (platform set)
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Selected Provider is efa (found 32 nics)
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 0 device #0 0000:74:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 0 device #1 0000:73:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 0 device #2 0000:72:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 0 device #3 0000:71:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 1 device #0 0000:85:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 1 device #1 0000:84:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 1 device #2 0000:83:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 1 device #3 0000:82:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 2 device #0 0000:52:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 2 device #1 0000:51:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 2 device #2 0000:50:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 2 device #3 0000:4f:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 3 device #0 0000:63:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 3 device #1 0000:62:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 3 device #2 0000:61:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 3 device #3 0000:60:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 4 device #0 0000:b8:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 4 device #1 0000:b7:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 4 device #2 0000:b6:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 4 device #3 0000:b5:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 5 device #0 0000:c9:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 5 device #1 0000:c8:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 5 device #2 0000:c7:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 5 device #3 0000:c6:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 6 device #0 0000:96:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 6 device #1 0000:95:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 6 device #2 0000:94:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 6 device #3 0000:93:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 7 device #0 0000:a7:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 7 device #1 0000:a6:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 7 device #2 0000:a5:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI NIC group 7 device #3 0000:a4:00.0
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Setting NCCL_TOPO_FILE environment variable to /proc/self/fd/157
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Creating one domain per process
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 0 device #0 0000:74:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 0 device #1 0000:73:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 0 device #2 0000:72:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 0 device #3 0000:71:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 1 device #0 0000:85:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 1 device #1 0000:84:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 1 device #2 0000:83:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 1 device #3 0000:82:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 2 device #0 0000:52:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 2 device #1 0000:51:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 2 device #2 0000:50:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 2 device #3 0000:4f:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 3 device #0 0000:63:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 3 device #1 0000:62:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 3 device #2 0000:61:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 3 device #3 0000:60:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 4 device #0 0000:b8:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 4 device #1 0000:b7:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 4 device #2 0000:b6:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 4 device #3 0000:b5:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 5 device #0 0000:c9:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 5 device #1 0000:c8:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 5 device #2 0000:c7:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 5 device #3 0000:c6:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 6 device #0 0000:96:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 6 device #1 0000:95:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 6 device #2 0000:94:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 6 device #3 0000:93:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 7 device #0 0000:a7:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 7 device #1 0000:a6:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 7 device #2 0000:a5:00.0
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI NIC group 7 device #3 0000:a4:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Selected Provider is efa (found 32 nics)
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Setting NCCL_TOPO_FILE environment variable to /proc/self/fd/157
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Creating one domain per process
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Selected Provider is efa (found 32 nics)
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Selected Provider is efa (found 32 nics)
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 0 device #0 0000:74:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 0 device #1 0000:73:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 0 device #2 0000:72:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 0 device #3 0000:71:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 1 device #0 0000:85:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 1 device #1 0000:84:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 1 device #2 0000:83:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 1 device #3 0000:82:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 2 device #0 0000:52:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 2 device #1 0000:51:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 2 device #2 0000:50:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 2 device #3 0000:4f:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 3 device #0 0000:63:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 3 device #1 0000:62:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 3 device #2 0000:61:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 3 device #3 0000:60:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 4 device #0 0000:b8:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 4 device #1 0000:b7:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 4 device #2 0000:b6:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 4 device #3 0000:b5:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 5 device #0 0000:c9:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 5 device #1 0000:c8:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 5 device #2 0000:c7:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 5 device #3 0000:c6:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 6 device #0 0000:96:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 6 device #1 0000:95:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 6 device #2 0000:94:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 6 device #3 0000:93:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 7 device #0 0000:a7:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 7 device #1 0000:a6:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 7 device #2 0000:a5:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI NIC group 7 device #3 0000:a4:00.0
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Setting NCCL_TOPO_FILE environment variable to /proc/self/fd/159
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Creating one domain per process
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Selected Provider is efa (found 32 nics)
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 0 device #0 0000:74:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 0 device #1 0000:73:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 0 device #2 0000:72:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 0 device #3 0000:71:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 1 device #0 0000:85:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 1 device #1 0000:84:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 1 device #2 0000:83:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 1 device #3 0000:82:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 2 device #0 0000:52:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 2 device #1 0000:51:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 2 device #2 0000:50:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 2 device #3 0000:4f:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 3 device #0 0000:63:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 3 device #1 0000:62:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 3 device #2 0000:61:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 3 device #3 0000:60:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 4 device #0 0000:b8:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 4 device #1 0000:b7:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 4 device #2 0000:b6:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 4 device #3 0000:b5:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 5 device #0 0000:c9:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 5 device #1 0000:c8:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 5 device #2 0000:c7:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 5 device #3 0000:c6:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 6 device #0 0000:96:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 6 device #1 0000:95:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 6 device #2 0000:94:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 6 device #3 0000:93:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 7 device #0 0000:a7:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 7 device #1 0000:a6:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 7 device #2 0000:a5:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI NIC group 7 device #3 0000:a4:00.0
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Setting NCCL_TOPO_FILE environment variable to /proc/self/fd/157
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Creating one domain per process
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Support for global registrations: true
+ip-172-18-131-43:121:201 [3] NCCL INFO NET/OFI Support for DMA-BUF registrations: false
+ip-172-18-131-43:121:201 [3] NCCL INFO PROFILER/Plugin: Could not find: libnccl-profiler.so.
+ip-172-18-131-43:121:201 [3] NCCL INFO Using network Libfabric
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Support for global registrations: true
+ip-172-18-131-43:122:200 [4] NCCL INFO NET/OFI Support for DMA-BUF registrations: false
+ip-172-18-131-43:122:200 [4] NCCL INFO PROFILER/Plugin: Could not find: libnccl-profiler.so.
+ip-172-18-131-43:122:200 [4] NCCL INFO Using network Libfabric
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Support for global registrations: true
+ip-172-18-131-43:118:199 [0] NCCL INFO NET/OFI Support for DMA-BUF registrations: false
+ip-172-18-131-43:118:199 [0] NCCL INFO PROFILER/Plugin: Could not find: libnccl-profiler.so.
+ip-172-18-131-43:118:199 [0] NCCL INFO Using network Libfabric
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 0 device #0 0000:74:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 0 device #1 0000:73:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 0 device #2 0000:72:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 0 device #3 0000:71:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 1 device #0 0000:85:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 1 device #1 0000:84:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 1 device #2 0000:83:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 1 device #3 0000:82:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 2 device #0 0000:52:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 2 device #1 0000:51:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 2 device #2 0000:50:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 2 device #3 0000:4f:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 3 device #0 0000:63:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 3 device #1 0000:62:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 3 device #2 0000:61:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 3 device #3 0000:60:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 4 device #0 0000:b8:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 4 device #1 0000:b7:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 4 device #2 0000:b6:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 4 device #3 0000:b5:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 5 device #0 0000:c9:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 5 device #1 0000:c8:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 5 device #2 0000:c7:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 5 device #3 0000:c6:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 6 device #0 0000:96:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 6 device #1 0000:95:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 6 device #2 0000:94:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 6 device #3 0000:93:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 7 device #0 0000:a7:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 7 device #1 0000:a6:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 7 device #2 0000:a5:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI NIC group 7 device #3 0000:a4:00.0
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Setting NCCL_TOPO_FILE environment variable to /proc/self/fd/157
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Creating one domain per process
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 0 device #0 0000:74:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 0 device #1 0000:73:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 0 device #2 0000:72:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 0 device #3 0000:71:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 1 device #0 0000:85:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 1 device #1 0000:84:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 1 device #2 0000:83:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 1 device #3 0000:82:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 2 device #0 0000:52:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 2 device #1 0000:51:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 2 device #2 0000:50:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 2 device #3 0000:4f:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 3 device #0 0000:63:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 3 device #1 0000:62:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 3 device #2 0000:61:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 3 device #3 0000:60:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 4 device #0 0000:b8:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 4 device #1 0000:b7:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 4 device #2 0000:b6:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 4 device #3 0000:b5:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 5 device #0 0000:c9:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 5 device #1 0000:c8:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 5 device #2 0000:c7:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 5 device #3 0000:c6:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 6 device #0 0000:96:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 6 device #1 0000:95:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 6 device #2 0000:94:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 6 device #3 0000:93:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 7 device #0 0000:a7:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 7 device #1 0000:a6:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 7 device #2 0000:a5:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI NIC group 7 device #3 0000:a4:00.0
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Setting NCCL_TOPO_FILE environment variable to /proc/self/fd/157
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Creating one domain per process
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 0 device #0 0000:74:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 0 device #1 0000:73:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 0 device #2 0000:72:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 0 device #3 0000:71:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 1 device #0 0000:85:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 1 device #1 0000:84:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 1 device #2 0000:83:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 1 device #3 0000:82:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 2 device #0 0000:52:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 2 device #1 0000:51:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 2 device #2 0000:50:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 2 device #3 0000:4f:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 3 device #0 0000:63:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 3 device #1 0000:62:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 3 device #2 0000:61:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 3 device #3 0000:60:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 4 device #0 0000:b8:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 4 device #1 0000:b7:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 4 device #2 0000:b6:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 4 device #3 0000:b5:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 5 device #0 0000:c9:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 5 device #1 0000:c8:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 5 device #2 0000:c7:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 5 device #3 0000:c6:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 6 device #0 0000:96:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 6 device #1 0000:95:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 6 device #2 0000:94:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 6 device #3 0000:93:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 7 device #0 0000:a7:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 7 device #1 0000:a6:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 7 device #2 0000:a5:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI NIC group 7 device #3 0000:a4:00.0
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Setting NCCL_TOPO_FILE environment variable to /proc/self/fd/157
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Creating one domain per process
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 0 device #0 0000:74:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 0 device #1 0000:73:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 0 device #2 0000:72:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 0 device #3 0000:71:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 1 device #0 0000:85:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 1 device #1 0000:84:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 1 device #2 0000:83:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 1 device #3 0000:82:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 2 device #0 0000:52:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 2 device #1 0000:51:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 2 device #2 0000:50:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 2 device #3 0000:4f:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 3 device #0 0000:63:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 3 device #1 0000:62:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 3 device #2 0000:61:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 3 device #3 0000:60:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 4 device #0 0000:b8:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 4 device #1 0000:b7:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 4 device #2 0000:b6:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 4 device #3 0000:b5:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 5 device #0 0000:c9:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 5 device #1 0000:c8:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 5 device #2 0000:c7:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 5 device #3 0000:c6:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 6 device #0 0000:96:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 6 device #1 0000:95:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 6 device #2 0000:94:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 6 device #3 0000:93:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 7 device #0 0000:a7:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 7 device #1 0000:a6:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 7 device #2 0000:a5:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI NIC group 7 device #3 0000:a4:00.0
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Setting NCCL_TOPO_FILE environment variable to /proc/self/fd/157
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Creating one domain per process
+ip-172-18-131-43:121:201 [3] NCCL INFO DMA-BUF is available on GPU device 3
+ip-172-18-131-43:121:201 [3] NCCL INFO ncclCommInitRankConfig comm 0x5577e22dd100 rank 3 nranks 16 cudaDev 3 nvmlDev 3 busId 86000 commId 0x32b7b57331eafa26 - Init START
+ip-172-18-131-43:122:200 [4] NCCL INFO DMA-BUF is available on GPU device 4
+ip-172-18-131-43:122:200 [4] NCCL INFO ncclCommInitRankConfig comm 0x561f5d2442e0 rank 4 nranks 16 cudaDev 4 nvmlDev 4 busId 97000 commId 0x32b7b57331eafa26 - Init START
+ip-172-18-131-43:118:199 [0] NCCL INFO DMA-BUF is available on GPU device 0
+ip-172-18-131-43:118:199 [0] NCCL INFO ncclCommInitRankConfig comm 0x561001180200 rank 0 nranks 16 cudaDev 0 nvmlDev 0 busId 53000 commId 0x32b7b57331eafa26 - Init START
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Support for global registrations: true
+ip-172-18-131-43:124:202 [6] NCCL INFO NET/OFI Support for DMA-BUF registrations: false
+ip-172-18-131-43:124:202 [6] NCCL INFO PROFILER/Plugin: Could not find: libnccl-profiler.so.
+ip-172-18-131-43:124:202 [6] NCCL INFO Using network Libfabric
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Support for global registrations: true
+ip-172-18-131-43:119:205 [1] NCCL INFO NET/OFI Support for DMA-BUF registrations: false
+ip-172-18-131-43:119:205 [1] NCCL INFO PROFILER/Plugin: Could not find: libnccl-profiler.so.
+ip-172-18-131-43:119:205 [1] NCCL INFO Using network Libfabric
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Support for global registrations: true
+ip-172-18-131-43:120:206 [2] NCCL INFO NET/OFI Support for DMA-BUF registrations: false
+ip-172-18-131-43:120:206 [2] NCCL INFO PROFILER/Plugin: Could not find: libnccl-profiler.so.
+ip-172-18-131-43:120:206 [2] NCCL INFO Using network Libfabric
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Support for global registrations: true
+ip-172-18-131-43:123:204 [5] NCCL INFO NET/OFI Support for DMA-BUF registrations: false
+ip-172-18-131-43:123:204 [5] NCCL INFO PROFILER/Plugin: Could not find: libnccl-profiler.so.
+ip-172-18-131-43:123:204 [5] NCCL INFO Using network Libfabric
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Support for global registrations: true
+ip-172-18-131-43:125:203 [7] NCCL INFO NET/OFI Support for DMA-BUF registrations: false
+ip-172-18-131-43:125:203 [7] NCCL INFO PROFILER/Plugin: Could not find: libnccl-profiler.so.
+ip-172-18-131-43:125:203 [7] NCCL INFO Using network Libfabric
+ip-172-18-131-43:124:202 [6] NCCL INFO DMA-BUF is available on GPU device 6
+ip-172-18-131-43:124:202 [6] NCCL INFO ncclCommInitRankConfig comm 0x561d99e42030 rank 6 nranks 16 cudaDev 6 nvmlDev 6 busId b9000 commId 0x32b7b57331eafa26 - Init START
+ip-172-18-131-43:119:205 [1] NCCL INFO DMA-BUF is available on GPU device 1
+ip-172-18-131-43:119:205 [1] NCCL INFO ncclCommInitRankConfig comm 0x555fb1ed74c0 rank 1 nranks 16 cudaDev 1 nvmlDev 1 busId 64000 commId 0x32b7b57331eafa26 - Init START
+ip-172-18-131-43:120:206 [2] NCCL INFO DMA-BUF is available on GPU device 2
+ip-172-18-131-43:120:206 [2] NCCL INFO ncclCommInitRankConfig comm 0x558ef28733a0 rank 2 nranks 16 cudaDev 2 nvmlDev 2 busId 75000 commId 0x32b7b57331eafa26 - Init START
+ip-172-18-131-43:123:204 [5] NCCL INFO DMA-BUF is available on GPU device 5
+ip-172-18-131-43:123:204 [5] NCCL INFO ncclCommInitRankConfig comm 0x55fc7cc68230 rank 5 nranks 16 cudaDev 5 nvmlDev 5 busId a8000 commId 0x32b7b57331eafa26 - Init START
+ip-172-18-131-43:125:203 [7] NCCL INFO DMA-BUF is available on GPU device 7
+ip-172-18-131-43:125:203 [7] NCCL INFO ncclCommInitRankConfig comm 0x559549d2d340 rank 7 nranks 16 cudaDev 7 nvmlDev 7 busId ca000 commId 0x32b7b57331eafa26 - Init START
+ip-172-18-131-43:125:203 [7] NCCL INFO Bootstrap timings total 0.001952 (create 0.000044, send 0.000125, recv 0.000394, ring 0.000769, delay 0.000001)
+ip-172-18-131-43:119:205 [1] NCCL INFO Bootstrap timings total 0.004508 (create 0.000049, send 0.000145, recv 0.001879, ring 0.002014, delay 0.000000)
+ip-172-18-131-43:123:204 [5] NCCL INFO Bootstrap timings total 0.002455 (create 0.000068, send 0.000189, recv 0.000292, ring 0.001458, delay 0.000001)
+ip-172-18-131-43:122:200 [4] NCCL INFO Bootstrap timings total 0.744397 (create 0.000062, send 0.000190, recv 0.742165, ring 0.001480, delay 0.000001)
+ip-172-18-131-43:124:202 [6] NCCL INFO Bootstrap timings total 0.108295 (create 0.000057, send 0.000189, recv 0.106500, ring 0.001019, delay 0.000001)
+ip-172-18-131-43:118:199 [0] NCCL INFO Bootstrap timings total 0.743845 (create 0.000057, send 0.000171, recv 0.739600, ring 0.003472, delay 0.000001)
+ip-172-18-131-43:120:206 [2] NCCL INFO Bootstrap timings total 0.003018 (create 0.000062, send 0.000135, recv 0.000352, ring 0.001894, delay 0.000001)
+ip-172-18-131-43:121:201 [3] NCCL INFO Bootstrap timings total 0.787190 (create 0.000066, send 0.000222, recv 0.042978, ring 0.001841, delay 0.000000)
+ip-172-18-131-43:125:203 [7] NCCL INFO MNNVL busId 0xca000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x0
+ip-172-18-131-43:123:204 [5] NCCL INFO MNNVL busId 0xa8000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x0
+ip-172-18-131-43:119:205 [1] NCCL INFO MNNVL busId 0x64000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x0
+ip-172-18-131-43:122:200 [4] NCCL INFO MNNVL busId 0x97000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x0
+ip-172-18-131-43:120:206 [2] NCCL INFO MNNVL busId 0x75000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x0
+ip-172-18-131-43:124:202 [6] NCCL INFO MNNVL busId 0xb9000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x0
+ip-172-18-131-43:118:199 [0] NCCL INFO MNNVL busId 0x53000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x0
+ip-172-18-131-43:121:201 [3] NCCL INFO MNNVL busId 0x86000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x0
+ip-172-18-131-43:125:203 [7] NCCL INFO NCCL_TOPO_FILE set by environment to /proc/self/fd/157
+ip-172-18-131-43:124:202 [6] NCCL INFO NCCL_TOPO_FILE set by environment to /proc/self/fd/157
+ip-172-18-131-43:123:204 [5] NCCL INFO NCCL_TOPO_FILE set by environment to /proc/self/fd/157
+ip-172-18-131-43:122:200 [4] NCCL INFO NCCL_TOPO_FILE set by environment to /proc/self/fd/157
+ip-172-18-131-43:120:206 [2] NCCL INFO NCCL_TOPO_FILE set by environment to /proc/self/fd/157
+ip-172-18-131-43:118:199 [0] NCCL INFO NCCL_TOPO_FILE set by environment to /proc/self/fd/159
+ip-172-18-131-43:119:205 [1] NCCL INFO NCCL_TOPO_FILE set by environment to /proc/self/fd/157
+ip-172-18-131-43:121:201 [3] NCCL INFO NCCL_TOPO_FILE set by environment to /proc/self/fd/157
+ip-172-18-131-43:124:202 [6] NCCL INFO Setting affinity for GPU 6 to ff,ffff0000,00000000
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS multicast support is available on dev 6
+ip-172-18-131-43:120:206 [2] NCCL INFO Setting affinity for GPU 2 to ffffff
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS multicast support is available on dev 2
+ip-172-18-131-43:121:201 [3] NCCL INFO Setting affinity for GPU 3 to ffffff
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS multicast support is available on dev 3
+ip-172-18-131-43:122:200 [4] NCCL INFO Setting affinity for GPU 4 to ffffff00,00000000,00000000
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS multicast support is available on dev 4
+ip-172-18-131-43:118:199 [0] NCCL INFO Setting affinity for GPU 0 to ffff,ff000000
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS multicast support is available on dev 0
+ip-172-18-131-43:123:204 [5] NCCL INFO Setting affinity for GPU 5 to ffffff00,00000000,00000000
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS multicast support is available on dev 5
+ip-172-18-131-43:119:205 [1] NCCL INFO Setting affinity for GPU 1 to ffff,ff000000
+ip-172-18-131-43:125:203 [7] NCCL INFO Setting affinity for GPU 7 to ff,ffff0000,00000000
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS multicast support is available on dev 1
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS multicast support is available on dev 7
+ip-172-18-131-43:125:203 [7] NCCL INFO comm 0x559549d2d340 rank 7 nRanks 16 nNodes 2 localRanks 8 localRank 7 MNNVL 0
+ip-172-18-131-43:124:202 [6] NCCL INFO comm 0x561d99e42030 rank 6 nRanks 16 nNodes 2 localRanks 8 localRank 6 MNNVL 0
+ip-172-18-131-43:123:204 [5] NCCL INFO comm 0x55fc7cc68230 rank 5 nRanks 16 nNodes 2 localRanks 8 localRank 5 MNNVL 0
+ip-172-18-131-43:122:200 [4] NCCL INFO comm 0x561f5d2442e0 rank 4 nRanks 16 nNodes 2 localRanks 8 localRank 4 MNNVL 0
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS Head  0:  2 10
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS Head  0:  2 10
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS Head  1:  3 11
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS Head  1:  3 11
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS Head  2:  0  8
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS Head  2:  0  8
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS Head  3:  1  9
+ip-172-18-131-43:121:201 [3] NCCL INFO comm 0x5577e22dd100 rank 3 nRanks 16 nNodes 2 localRanks 8 localRank 3 MNNVL 0
+ip-172-18-131-43:120:206 [2] NCCL INFO comm 0x558ef28733a0 rank 2 nRanks 16 nNodes 2 localRanks 8 localRank 2 MNNVL 0
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS Head  3:  1  9
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS Head  4:  6 14
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS Head  0:  2 10
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS Head  0:  2 10
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS Head  5:  7 15
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS Head  4:  6 14
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS Head  1:  3 11
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS Head  1:  3 11
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS Head  5:  7 15
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS Head  6:  4 12
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS Head  2:  0  8
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS Head  2:  0  8
+ip-172-18-131-43:125:203 [7] NCCL INFO NVLS Head  7:  5 13
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS Head  6:  4 12
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS Head  3:  1  9
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS Head  3:  1  9
+ip-172-18-131-43:124:202 [6] NCCL INFO NVLS Head  7:  5 13
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS Head  4:  6 14
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS Head  4:  6 14
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS Head  0:  2 10
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS Head  0:  2 10
+ip-172-18-131-43:118:199 [0] NCCL INFO comm 0x561001180200 rank 0 nRanks 16 nNodes 2 localRanks 8 localRank 0 MNNVL 0
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS Head  1:  3 11
+ip-172-18-131-43:119:205 [1] NCCL INFO comm 0x555fb1ed74c0 rank 1 nRanks 16 nNodes 2 localRanks 8 localRank 1 MNNVL 0
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS Head  5:  7 15
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS Head  5:  7 15
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS Head  1:  3 11
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS Head  2:  0  8
+ip-172-18-131-43:124:202 [6] NCCL INFO Trees [0] 7/-1/-1->6->1 [1] 7/-1/-1->6->1 [2] 7/-1/-1->6->1 [3] 7/-1/-1->6->1 [4] 7/14/-1->6->-1 [5] -1/-1/-1->6->1 [6] 7/-1/-1->6->1 [7] 7/-1/-1->6->1 [8] 7/-1/-1->6->1 [9] 7/-1/-1->6->1 [10] 7/-1/-1->6->1 [11] 7/-1/-1->6->1 [12] 7/-1/-1->6->14 [13] -1/-1/-1->6->1 [14] 7/-1/-1->6->1 [15] 7/-1/-1->6->1
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS Head  6:  4 12
+ip-172-18-131-43:125:203 [7] NCCL INFO Trees [0] 4/-1/-1->7->6 [1] 4/-1/-1->7->6 [2] 4/-1/-1->7->6 [3] 4/-1/-1->7->6 [4] 4/-1/-1->7->6 [5] 4/15/-1->7->-1 [6] -1/-1/-1->7->6 [7] 4/-1/-1->7->6 [8] 4/-1/-1->7->6 [9] 4/-1/-1->7->6 [10] 4/-1/-1->7->6 [11] 4/-1/-1->7->6 [12] 4/-1/-1->7->6 [13] 4/-1/-1->7->15 [14] -1/-1/-1->7->6 [15] 4/-1/-1->7->6
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS Head  6:  4 12
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS Head  2:  0  8
+ip-172-18-131-43:124:202 [6] NCCL INFO P2P Chunksize set to 131072
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS Head  3:  1  9
+ip-172-18-131-43:125:203 [7] NCCL INFO P2P Chunksize set to 131072
+ip-172-18-131-43:123:204 [5] NCCL INFO NVLS Head  7:  5 13
+ip-172-18-131-43:122:200 [4] NCCL INFO NVLS Head  7:  5 13
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS Head  4:  6 14
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS Head  3:  1  9
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS Head  0:  2 10
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS Head  5:  7 15
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS Head  4:  6 14
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS Head  1:  3 11
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS Head  0:  2 10
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS Head  6:  4 12
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS Head  5:  7 15
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS Head  2:  0  8
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS Head  1:  3 11
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS Head  3:  1  9
+ip-172-18-131-43:121:201 [3] NCCL INFO NVLS Head  7:  5 13
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS Head  6:  4 12
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS Head  2:  0  8
+ip-172-18-131-43:123:204 [5] NCCL INFO Trees [0] -1/-1/-1->5->4 [1] 2/-1/-1->5->4 [2] 2/-1/-1->5->4 [3] 2/-1/-1->5->4 [4] 2/-1/-1->5->4 [5] 2/-1/-1->5->4 [6] 2/-1/-1->5->4 [7] 2/13/-1->5->-1 [8] -1/-1/-1->5->4 [9] 2/-1/-1->5->4 [10] 2/-1/-1->5->4 [11] 2/-1/-1->5->4 [12] 2/-1/-1->5->4 [13] 2/-1/-1->5->4 [14] 2/-1/-1->5->4 [15] 2/-1/-1->5->13
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS Head  4:  6 14
+ip-172-18-131-43:122:200 [4] NCCL INFO Trees [0] 5/-1/-1->4->7 [1] 5/-1/-1->4->7 [2] 5/-1/-1->4->7 [3] 5/-1/-1->4->7 [4] 5/-1/-1->4->7 [5] 5/-1/-1->4->7 [6] 5/12/-1->4->-1 [7] -1/-1/-1->4->7 [8] 5/-1/-1->4->7 [9] 5/-1/-1->4->7 [10] 5/-1/-1->4->7 [11] 5/-1/-1->4->7 [12] 5/-1/-1->4->7 [13] 5/-1/-1->4->7 [14] 5/-1/-1->4->12 [15] -1/-1/-1->4->7
+ip-172-18-131-43:120:206 [2] NCCL INFO NVLS Head  7:  5 13
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS Head  3:  1  9
+ip-172-18-131-43:123:204 [5] NCCL INFO P2P Chunksize set to 131072
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS Head  5:  7 15
+ip-172-18-131-43:122:200 [4] NCCL INFO P2P Chunksize set to 131072
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS Head  4:  6 14
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS Head  6:  4 12
+ip-172-18-131-43:121:201 [3] NCCL INFO Trees [0] 0/-1/-1->3->2 [1] 0/11/-1->3->-1 [2] -1/-1/-1->3->2 [3] 0/-1/-1->3->2 [4] 0/-1/-1->3->2 [5] 0/-1/-1->3->2 [6] 0/-1/-1->3->2 [7] 0/-1/-1->3->2 [8] 0/-1/-1->3->2 [9] 0/-1/-1->3->11 [10] -1/-1/-1->3->2 [11] 0/-1/-1->3->2 [12] 0/-1/-1->3->2 [13] 0/-1/-1->3->2 [14] 0/-1/-1->3->2 [15] 0/-1/-1->3->2
+ip-172-18-131-43:118:199 [0] NCCL INFO NVLS Head  7:  5 13
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS Head  5:  7 15
+ip-172-18-131-43:121:201 [3] NCCL INFO P2P Chunksize set to 131072
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS Head  6:  4 12
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 00/16 :  0  3 11  8  9 14 15 12 13 10  2  5  4  7  6  1
+ip-172-18-131-43:119:205 [1] NCCL INFO NVLS Head  7:  5 13
+ip-172-18-131-43:120:206 [2] NCCL INFO Trees [0] 3/10/-1->2->-1 [1] -1/-1/-1->2->5 [2] 3/-1/-1->2->5 [3] 3/-1/-1->2->5 [4] 3/-1/-1->2->5 [5] 3/-1/-1->2->5 [6] 3/-1/-1->2->5 [7] 3/-1/-1->2->5 [8] 3/-1/-1->2->10 [9] -1/-1/-1->2->5 [10] 3/-1/-1->2->5 [11] 3/-1/-1->2->5 [12] 3/-1/-1->2->5 [13] 3/-1/-1->2->5 [14] 3/-1/-1->2->5 [15] 3/-1/-1->2->5
+ip-172-18-131-43:120:206 [2] NCCL INFO P2P Chunksize set to 131072
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 01/16 :  0  1  6  7  4  5  2 10 13 12 15 14  9  8 11  3
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 02/16 :  0  3  2  5  4  7  6  1  9 14 15 12 13 10 11  8
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 03/16 :  0  8 11 10 13 12 15 14  9  1  6  7  4  5  2  3
+ip-172-18-131-43:119:205 [1] NCCL INFO Trees [0] 6/-1/-1->1->0 [1] 6/-1/-1->1->0 [2] 6/-1/-1->1->0 [3] 6/9/-1->1->-1 [4] -1/-1/-1->1->0 [5] 6/-1/-1->1->0 [6] 6/-1/-1->1->0 [7] 6/-1/-1->1->0 [8] 6/-1/-1->1->0 [9] 6/-1/-1->1->0 [10] 6/-1/-1->1->0 [11] 6/-1/-1->1->9 [12] -1/-1/-1->1->0 [13] 6/-1/-1->1->0 [14] 6/-1/-1->1->0 [15] 6/-1/-1->1->0
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 04/16 :  0  3  2  5  4  7 15 12 13 10 11  8  9 14  6  1
+ip-172-18-131-43:119:205 [1] NCCL INFO P2P Chunksize set to 131072
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 05/16 :  0  1  6 14  9  8 11 10 13 12 15  7  4  5  2  3
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 06/16 :  0  3  2  5 13 10 11  8  9 14 15 12  4  7  6  1
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 07/16 :  0  1  6  7  4 12 15 14  9  8 11 10 13  5  2  3
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 08/16 :  0  3 11  8  9 14 15 12 13 10  2  5  4  7  6  1
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 09/16 :  0  1  6  7  4  5  2 10 13 12 15 14  9  8 11  3
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 10/16 :  0  3  2  5  4  7  6  1  9 14 15 12 13 10 11  8
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 11/16 :  0  8 11 10 13 12 15 14  9  1  6  7  4  5  2  3
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 12/16 :  0  3  2  5  4  7 15 12 13 10 11  8  9 14  6  1
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 13/16 :  0  1  6 14  9  8 11 10 13 12 15  7  4  5  2  3
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 14/16 :  0  3  2  5 13 10 11  8  9 14 15 12  4  7  6  1
+ip-172-18-131-43:118:199 [0] NCCL INFO Channel 15/16 :  0  1  6  7  4 12 15 14  9  8 11 10 13  5  2  3
+ip-172-18-131-43:118:199 [0] NCCL INFO Trees [0] 1/-1/-1->0->3 [1] 1/-1/-1->0->3 [2] 1/8/-1->0->-1 [3] -1/-1/-1->0->3 [4] 1/-1/-1->0->3 [5] 1/-1/-1->0->3 [6] 1/-1/-1->0->3 [7] 1/-1/-1->0->3 [8] 1/-1/-1->0->3 [9] 1/-1/-1->0->3 [10] 1/-1/-1->0->8 [11] -1/-1/-1->0->3 [12] 1/-1/-1->0->3 [13] 1/-1/-1->0->3 [14] 1/-1/-1->0->3 [15] 1/-1/-1->0->3
+ip-172-18-131-43:118:199 [0] NCCL INFO P2P Chunksize set to 131072
+ip-172-18-131-43:122:211 [4] NCCL INFO [Proxy Service] Device 4 CPU core 84
+ip-172-18-131-43:123:209 [5] NCCL INFO [Proxy Service] Device 5 CPU core 94
+ip-172-18-131-43:125:208 [7] NCCL INFO [Proxy Service] Device 7 CPU core 66
+ip-172-18-131-43:125:212 [7] NCCL INFO [Proxy Service UDS] Device 7 CPU core 62
+ip-172-18-131-43:123:213 [5] NCCL INFO [Proxy Service UDS] Device 5 CPU core 88
+ip-172-18-131-43:122:217 [4] NCCL INFO [Proxy Service UDS] Device 4 CPU core 85
+ip-172-18-131-43:124:215 [6] NCCL INFO [Proxy Service UDS] Device 6 CPU core 65
+ip-172-18-131-43:120:210 [2] NCCL INFO [Proxy Service] Device 2 CPU core 19
+ip-172-18-131-43:120:216 [2] NCCL INFO [Proxy Service UDS] Device 2 CPU core 6
+ip-172-18-131-43:118:222 [0] NCCL INFO [Proxy Service UDS] Device 0 CPU core 41
+ip-172-18-131-43:119:214 [1] NCCL INFO [Proxy Service] Device 1 CPU core 43
+ip-172-18-131-43:124:207 [6] NCCL INFO [Proxy Service] Device 6 CPU core 66
+ip-172-18-131-43:118:220 [0] NCCL INFO [Proxy Service] Device 0 CPU core 34
+ip-172-18-131-43:121:218 [3] NCCL INFO [Proxy Service] Device 3 CPU core 9
+ip-172-18-131-43:121:221 [3] NCCL INFO [Proxy Service UDS] Device 3 CPU core 18
+ip-172-18-131-43:119:219 [1] NCCL INFO [Proxy Service UDS] Device 1 CPU core 34
+ip-172-18-131-43:121:201 [3] NCCL INFO NCCL_NVLS_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:120:206 [2] NCCL INFO NCCL_NVLS_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:125:203 [7] NCCL INFO NCCL_NVLS_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:123:204 [5] NCCL INFO NCCL_NVLS_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:119:205 [1] NCCL INFO NCCL_NVLS_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:118:199 [0] NCCL INFO NCCL_NVLS_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:122:200 [4] NCCL INFO NCCL_NVLS_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:124:202 [6] NCCL INFO NCCL_NVLS_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:119:205 [1] NCCL INFO threadThresholds 8/8/64 | 128/8/64 | 512 | 512
+ip-172-18-131-43:119:205 [1] NCCL INFO 16 coll channels, 16 collnet channels, 16 nvls channels, 16 p2p channels, 2 p2p channels per peer
+ip-172-18-131-43:120:206 [2] NCCL INFO threadThresholds 8/8/64 | 128/8/64 | 512 | 512
+ip-172-18-131-43:120:206 [2] NCCL INFO 16 coll channels, 16 collnet channels, 16 nvls channels, 16 p2p channels, 2 p2p channels per peer
+ip-172-18-131-43:123:204 [5] NCCL INFO threadThresholds 8/8/64 | 128/8/64 | 512 | 512
+ip-172-18-131-43:123:204 [5] NCCL INFO 16 coll channels, 16 collnet channels, 16 nvls channels, 16 p2p channels, 2 p2p channels per peer
+ip-172-18-131-43:124:202 [6] NCCL INFO threadThresholds 8/8/64 | 128/8/64 | 512 | 512
+ip-172-18-131-43:124:202 [6] NCCL INFO 16 coll channels, 16 collnet channels, 16 nvls channels, 16 p2p channels, 2 p2p channels per peer
+ip-172-18-131-43:118:199 [0] NCCL INFO threadThresholds 8/8/64 | 128/8/64 | 512 | 512
+ip-172-18-131-43:118:199 [0] NCCL INFO 16 coll channels, 16 collnet channels, 16 nvls channels, 16 p2p channels, 2 p2p channels per peer
+ip-172-18-131-43:122:200 [4] NCCL INFO threadThresholds 8/8/64 | 128/8/64 | 512 | 512
+ip-172-18-131-43:122:200 [4] NCCL INFO 16 coll channels, 16 collnet channels, 16 nvls channels, 16 p2p channels, 2 p2p channels per peer
+ip-172-18-131-43:125:203 [7] NCCL INFO threadThresholds 8/8/64 | 128/8/64 | 512 | 512
+ip-172-18-131-43:125:203 [7] NCCL INFO 16 coll channels, 16 collnet channels, 16 nvls channels, 16 p2p channels, 2 p2p channels per peer
+ip-172-18-131-43:118:199 [0] NCCL INFO CC Off, Multi-GPU CC Off, workFifoBytes 1048576
+ip-172-18-131-43:121:201 [3] NCCL INFO threadThresholds 8/8/64 | 128/8/64 | 512 | 512
+ip-172-18-131-43:121:201 [3] NCCL INFO 16 coll channels, 16 collnet channels, 16 nvls channels, 16 p2p channels, 2 p2p channels per peer
+ip-172-18-131-43:122:200 [4] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v3 symbol.
+ip-172-18-131-43:125:203 [7] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v3 symbol.
+ip-172-18-131-43:123:204 [5] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v3 symbol.
+ip-172-18-131-43:122:200 [4] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v2 symbol, using internal tuner instead.
+ip-172-18-131-43:119:205 [1] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v3 symbol.
+ip-172-18-131-43:125:203 [7] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v2 symbol, using internal tuner instead.
+ip-172-18-131-43:118:199 [0] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v3 symbol.
+ip-172-18-131-43:123:204 [5] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v2 symbol, using internal tuner instead.
+ip-172-18-131-43:122:200 [4] NCCL INFO ncclCommInitRankConfig comm 0x561f5d2442e0 rank 4 nranks 16 cudaDev 4 nvmlDev 4 busId 97000 commId 0x32b7b57331eafa26 - Init COMPLETE
+ip-172-18-131-43:119:205 [1] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v2 symbol, using internal tuner instead.
+ip-172-18-131-43:125:203 [7] NCCL INFO ncclCommInitRankConfig comm 0x559549d2d340 rank 7 nranks 16 cudaDev 7 nvmlDev 7 busId ca000 commId 0x32b7b57331eafa26 - Init COMPLETE
+ip-172-18-131-43:118:199 [0] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v2 symbol, using internal tuner instead.
+ip-172-18-131-43:120:206 [2] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v3 symbol.
+ip-172-18-131-43:123:204 [5] NCCL INFO ncclCommInitRankConfig comm 0x55fc7cc68230 rank 5 nranks 16 cudaDev 5 nvmlDev 5 busId a8000 commId 0x32b7b57331eafa26 - Init COMPLETE
+ip-172-18-131-43:119:205 [1] NCCL INFO ncclCommInitRankConfig comm 0x555fb1ed74c0 rank 1 nranks 16 cudaDev 1 nvmlDev 1 busId 64000 commId 0x32b7b57331eafa26 - Init COMPLETE
+ip-172-18-131-43:122:200 [4] NCCL INFO Init timings - ncclCommInitRankConfig: rank 4 nranks 16 total 2.46 (kernels 0.35, alloc 1.05, bootstrap 0.74, allgathers 0.01, topo 0.06, graphs 0.01, connections 0.24, rest 0.00)
+ip-172-18-131-43:120:206 [2] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v2 symbol, using internal tuner instead.
+ip-172-18-131-43:118:199 [0] NCCL INFO ncclCommInitRankConfig comm 0x561001180200 rank 0 nranks 16 cudaDev 0 nvmlDev 0 busId 53000 commId 0x32b7b57331eafa26 - Init COMPLETE
+ip-172-18-131-43:123:204 [5] NCCL INFO Init timings - ncclCommInitRankConfig: rank 5 nranks 16 total 2.06 (kernels 0.18, alloc 1.55, bootstrap 0.00, allgathers 0.01, topo 0.06, graphs 0.01, connections 0.24, rest 0.00)
+ip-172-18-131-43:125:203 [7] NCCL INFO Init timings - ncclCommInitRankConfig: rank 7 nranks 16 total 2.06 (kernels 0.19, alloc 1.55, bootstrap 0.00, allgathers 0.01, topo 0.06, graphs 0.01, connections 0.24, rest 0.00)
+ip-172-18-131-43:119:205 [1] NCCL INFO Init timings - ncclCommInitRankConfig: rank 1 nranks 16 total 2.06 (kernels 0.18, alloc 1.55, bootstrap 0.00, allgathers 0.01, topo 0.06, graphs 0.01, connections 0.24, rest 0.00)
+ip-172-18-131-43:120:206 [2] NCCL INFO ncclCommInitRankConfig comm 0x558ef28733a0 rank 2 nranks 16 cudaDev 2 nvmlDev 2 busId 75000 commId 0x32b7b57331eafa26 - Init COMPLETE
+ip-172-18-131-43:118:199 [0] NCCL INFO Init timings - ncclCommInitRankConfig: rank 0 nranks 16 total 2.46 (kernels 0.35, alloc 1.05, bootstrap 0.74, allgathers 0.01, topo 0.06, graphs 0.01, connections 0.24, rest 0.00)
+ip-172-18-131-43:124:202 [6] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v3 symbol.
+ip-172-18-131-43:120:206 [2] NCCL INFO Init timings - ncclCommInitRankConfig: rank 2 nranks 16 total 2.05 (kernels 0.18, alloc 1.55, bootstrap 0.00, allgathers 0.01, topo 0.06, graphs 0.01, connections 0.24, rest 0.00)
+ip-172-18-131-43:124:202 [6] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v2 symbol, using internal tuner instead.
+ip-172-18-131-43:124:202 [6] NCCL INFO ncclCommInitRankConfig comm 0x561d99e42030 rank 6 nranks 16 cudaDev 6 nvmlDev 6 busId b9000 commId 0x32b7b57331eafa26 - Init COMPLETE
+ip-172-18-131-43:124:202 [6] NCCL INFO Init timings - ncclCommInitRankConfig: rank 6 nranks 16 total 2.06 (kernels 0.18, alloc 1.45, bootstrap 0.11, allgathers 0.01, topo 0.06, graphs 0.01, connections 0.24, rest 0.00)
+ip-172-18-131-43:121:201 [3] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v3 symbol.
+ip-172-18-131-43:121:201 [3] NCCL INFO TUNER/Plugin: Failed to find ncclTunerPlugin_v2 symbol, using internal tuner instead.
+ip-172-18-131-43:121:201 [3] NCCL INFO ncclCommInitRankConfig comm 0x5577e22dd100 rank 3 nranks 16 cudaDev 3 nvmlDev 3 busId 86000 commId 0x32b7b57331eafa26 - Init COMPLETE
+ip-172-18-131-43:121:201 [3] NCCL INFO Init timings - ncclCommInitRankConfig: rank 3 nranks 16 total 2.35 (kernels 0.27, alloc 0.97, bootstrap 0.79, allgathers 0.01, topo 0.06, graphs 0.01, connections 0.24, rest 0.00)
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 00/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 01/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 02/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 03/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 02/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 04/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 04/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 06/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 05/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 07/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 06/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 07/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 08/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 09/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 08/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 10/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 09/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 11/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 10/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 00/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 00/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 12/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 14/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 01/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 12/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 02/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 03/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 13/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 15/0 : 6[6] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 04/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 14/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 15/0 : 0[0] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 05/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 02/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 06/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 03/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 00/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 00/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 01/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 07/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 01/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 04/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 03/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 02/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 05/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 04/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 08/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 06/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 03/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 05/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 06/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 10/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 08/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 05/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 11/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 09/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 07/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 10/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 12/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 08/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 06/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 07/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 11/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 09/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 13/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 14/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 12/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 11/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 08/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 15/0 : 2[2] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 13/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 01/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 12/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 09/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 02/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 14/0 : 4[4] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 13/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 10/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 11/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 03/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 14/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 00/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 01/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 04/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 15/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 13/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 05/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 02/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 06/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 03/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 14/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 07/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 09/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 04/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 15/0 : 1[1] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 05/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 10/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 07/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 11/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO NCCL_NET_FORCE_FLUSH set by environment to 0.
+ip-172-18-131-43:124:224 [6] NCCL INFO NCCL_NET_FORCE_FLUSH set by environment to 0.
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 08/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 12/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 09/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 13/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 10/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 11/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 14/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 12/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 15/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 13/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:225 [0] NCCL INFO NCCL_NET_FORCE_FLUSH set by environment to 0.
+ip-172-18-131-43:121:226 [3] NCCL INFO NCCL_NET_FORCE_FLUSH set by environment to 0.
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 15/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:230 [2] NCCL INFO NCCL_NET_FORCE_FLUSH set by environment to 0.
+ip-172-18-131-43:123:228 [5] NCCL INFO NCCL_NET_FORCE_FLUSH set by environment to 0.
+ip-172-18-131-43:125:227 [7] NCCL INFO NCCL_NET_FORCE_FLUSH set by environment to 0.
+ip-172-18-131-43:122:229 [4] NCCL INFO NCCL_NET_FORCE_FLUSH set by environment to 0.
+ip-172-18-131-43:124:231 [6] NCCL INFO [Proxy Progress] Device 6 CPU core 66
+ip-172-18-131-43:119:232 [1] NCCL INFO [Proxy Progress] Device 1 CPU core 41
+ip-172-18-131-43:118:233 [0] NCCL INFO [Proxy Progress] Device 0 CPU core 43
+ip-172-18-131-43:123:235 [5] NCCL INFO [Proxy Progress] Device 5 CPU core 74
+ip-172-18-131-43:121:234 [3] NCCL INFO [Proxy Progress] Device 3 CPU core 19
+ip-172-18-131-43:125:236 [7] NCCL INFO [Proxy Progress] Device 7 CPU core 64
+ip-172-18-131-43:122:237 [4] NCCL INFO [Proxy Progress] Device 4 CPU core 75
+ip-172-18-131-43:120:238 [2] NCCL INFO [Proxy Progress] Device 2 CPU core 11
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 04/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 12/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 04/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 12/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 03/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 11/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 03/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 11/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 00/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 08/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 00/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:120:230 [2] NCCL INFO Channel 08/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 06/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 02/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 05/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 14/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 01/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 07/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 10/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 06/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 13/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 15/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:122:229 [4] NCCL INFO Channel 14/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 05/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 09/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 02/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 07/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 13/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 01/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:118:225 [0] NCCL INFO Channel 10/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 15/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 09/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 00/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 01/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 01/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 03/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 04/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 00/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 00/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 05/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 01/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 01/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 06/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 02/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 02/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 02/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 07/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 03/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 04/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 03/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 08/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 09/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 05/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 03/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 06/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 11/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 05/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 04/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 07/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 05/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 07/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 08/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 08/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 09/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 12/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 09/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 10/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 13/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 10/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 11/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 14/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 06/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 13/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 11/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 15/0 : 3[3] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 14/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 12/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 07/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:124:224 [6] NCCL INFO Channel 15/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 13/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 09/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 15/0 : 7[7] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 10/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 00/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 11/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 01/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 12/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 02/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 03/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 13/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 04/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 14/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 06/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 15/0 : 5[5] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 07/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 00/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 08/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 09/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 00/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 01/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 00/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 02/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 01/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 02/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 02/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 10/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 03/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 04/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 11/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 04/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 05/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 12/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 05/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 03/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 04/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 06/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 14/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Channel 15/0 : 7[7] -> 6[6] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 08/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 05/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 06/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 09/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 06/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 07/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 08/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 07/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 10/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 08/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 09/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 11/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 10/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 11/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 10/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 12/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 12/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 13/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:123:228 [5] NCCL INFO Channel 14/0 : 5[5] -> 4[4] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 12/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 13/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 13/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 14/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:119:223 [1] NCCL INFO Channel 15/0 : 1[1] -> 0[0] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 14/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:121:226 [3] NCCL INFO Channel 15/0 : 3[3] -> 2[2] via P2P/CUMEM
+ip-172-18-131-43:125:227 [7] NCCL INFO Connected all trees
+ip-172-18-131-43:124:224 [6] NCCL INFO Connected all trees
+ip-172-18-131-43:121:226 [3] NCCL INFO Connected all trees
+ip-172-18-131-43:122:229 [4] NCCL INFO Connected all trees
+ip-172-18-131-43:123:228 [5] NCCL INFO Connected all trees
+ip-172-18-131-43:120:230 [2] NCCL INFO Connected all trees
+ip-172-18-131-43:119:223 [1] NCCL INFO Connected all trees
+ip-172-18-131-43:118:225 [0] NCCL INFO Connected all trees
+[rank 0] size=0.001GB t=0.46ms busBw=4.3 GB/s
+ip-172-18-131-43:122:239 [4] NCCL INFO Channel 06/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:118:241 [0] NCCL INFO Channel 02/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:122:239 [4] NCCL INFO Channel 14/0 : 4[4] -> 7[7] via P2P/CUMEM
+ip-172-18-131-43:120:246 [2] NCCL INFO Channel 00/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:241 [0] NCCL INFO Channel 10/0 : 0[0] -> 3[3] via P2P/CUMEM
+ip-172-18-131-43:124:244 [6] NCCL INFO Channel 05/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:119:245 [1] NCCL INFO Channel 02/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:124:244 [6] NCCL INFO Channel 13/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:119:245 [1] NCCL INFO Channel 10/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:120:246 [2] NCCL INFO Channel 08/0 : 2[2] -> 5[5] via P2P/CUMEM
+ip-172-18-131-43:118:241 [0] NCCL INFO Channel 03/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:121:240 [3] NCCL INFO Channel 00/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:118:241 [0] NCCL INFO Channel 11/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:121:240 [3] NCCL INFO Channel 08/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:122:239 [4] NCCL INFO Channel 07/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:242 [7] NCCL INFO Channel 04/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:246 [2] NCCL INFO Channel 01/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:125:242 [7] NCCL INFO Channel 12/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:122:239 [4] NCCL INFO Channel 15/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:123:243 [5] NCCL INFO Channel 06/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:124:244 [6] NCCL INFO Channel 04/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:123:243 [5] NCCL INFO Channel 14/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:120:246 [2] NCCL INFO Channel 09/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:124:244 [6] NCCL INFO Channel 12/0 : 6[6] -> 1[1] via P2P/CUMEM
+ip-172-18-131-43:118:241 [0] NCCL INFO Connected all rings
+ip-172-18-131-43:121:240 [3] NCCL INFO Connected all rings
+ip-172-18-131-43:123:243 [5] NCCL INFO Connected all rings
+ip-172-18-131-43:119:245 [1] NCCL INFO Connected all rings
+ip-172-18-131-43:124:244 [6] NCCL INFO Connected all rings
+ip-172-18-131-43:122:239 [4] NCCL INFO Connected all rings
+ip-172-18-131-43:125:242 [7] NCCL INFO Connected all rings
+ip-172-18-131-43:120:246 [2] NCCL INFO Connected all rings
+[rank 0] size=0.017GB t=0.39ms busBw=80.8 GB/s
+ip-172-18-131-43:125:254 [7] NCCL INFO NVLS comm 0x559549d2d340 headRank 5 nHeads 8 buffSize 4194304 nvlsPerRankSize 134217728 nvlsTotalSize 1073741824
+ip-172-18-131-43:119:247 [1] NCCL INFO NVLS comm 0x555fb1ed74c0 headRank 3 nHeads 8 buffSize 4194304 nvlsPerRankSize 134217728 nvlsTotalSize 1073741824
+ip-172-18-131-43:122:250 [4] NCCL INFO NVLS comm 0x561f5d2442e0 headRank 6 nHeads 8 buffSize 4194304 nvlsPerRankSize 134217728 nvlsTotalSize 1073741824
+ip-172-18-131-43:123:253 [5] NCCL INFO NVLS comm 0x55fc7cc68230 headRank 7 nHeads 8 buffSize 4194304 nvlsPerRankSize 134217728 nvlsTotalSize 1073741824
+ip-172-18-131-43:120:249 [2] NCCL INFO NVLS comm 0x558ef28733a0 headRank 0 nHeads 8 buffSize 4194304 nvlsPerRankSize 134217728 nvlsTotalSize 1073741824
+ip-172-18-131-43:124:251 [6] NCCL INFO NVLS comm 0x561d99e42030 headRank 4 nHeads 8 buffSize 4194304 nvlsPerRankSize 134217728 nvlsTotalSize 1073741824
+ip-172-18-131-43:121:248 [3] NCCL INFO NVLS comm 0x5577e22dd100 headRank 1 nHeads 8 buffSize 4194304 nvlsPerRankSize 134217728 nvlsTotalSize 1073741824
+ip-172-18-131-43:118:252 [0] NCCL INFO NVLS comm 0x561001180200 headRank 2 nHeads 8 buffSize 4194304 nvlsPerRankSize 134217728 nvlsTotalSize 1073741824
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 00/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 00/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 00/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 00/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 00/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 01/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 00/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 00/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 01/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 01/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 01/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 01/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 01/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 02/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 01/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 02/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 03/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 02/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 02/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 02/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 02/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 03/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 02/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 03/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 03/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 04/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 03/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 04/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 03/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 04/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 03/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 05/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 05/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 04/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 04/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 05/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 04/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 05/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 04/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 06/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 06/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 05/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 05/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 06/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 06/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 06/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 05/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 07/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 07/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 07/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 06/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 07/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 07/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 06/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 07/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 08/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 08/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 08/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 08/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 07/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 08/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 08/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 08/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 09/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 09/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 09/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 09/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 09/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 10/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 09/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 09/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 11/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 10/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 10/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 10/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 10/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 11/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 10/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 10/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 12/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 11/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 11/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 11/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 11/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 12/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 11/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 12/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 13/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 13/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 12/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 12/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 12/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 13/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 13/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 12/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 14/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 14/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 13/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 14/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 13/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 14/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 14/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 15/0 : 8[0] -> 0[0] [receive] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 15/0 : 14[6] -> 6[6] [receive] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 13/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 15/0 : 15[7] -> 7[7] [receive] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 14/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 15/0 : 11[3] -> 3[3] [receive] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 15/0 : 12[4] -> 4[4] [receive] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 15/0 : 9[1] -> 1[1] [receive] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 00/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 00/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 14/0 : 13[5] -> 5[5] [receive] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 00/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 02/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 15/0 : 10[2] -> 2[2] [receive] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 00/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 00/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 01/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 01/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 00/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 01/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 03/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 02/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 01/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 01/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 02/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 04/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 01/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 02/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 04/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 03/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 02/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 04/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 05/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 03/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 02/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 03/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 05/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 04/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 03/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 05/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 06/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 06/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 03/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 06/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 06/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 05/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 04/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 06/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 07/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 07/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 04/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 07/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 07/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 06/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 05/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 07/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 08/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 08/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 08/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 05/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 07/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 10/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 08/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 08/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 09/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 09/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 08/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 09/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 11/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 10/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 09/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 09/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 10/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 12/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 09/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 10/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 11/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 12/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 12/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 10/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 11/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 13/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 10/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 11/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 12/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 11/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 13/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 14/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 14/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 13/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 14/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 11/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 13/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 12/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 14/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Channel 15/0 : 0[0] -> 8[0] [send] via NET/Libfabric/2/GDRDMA
+ip-172-18-131-43:124:251 [6] NCCL INFO Channel 15/0 : 6[6] -> 14[6] [send] via NET/Libfabric/4/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 14/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 12/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:125:254 [7] NCCL INFO Channel 15/0 : 7[7] -> 15[7] [send] via NET/Libfabric/5/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 14/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:122:250 [4] NCCL INFO Channel 13/0 : 4[4] -> 12[4] [send] via NET/Libfabric/6/GDRDMA
+ip-172-18-131-43:119:247 [1] NCCL INFO Channel 15/0 : 1[1] -> 9[1] [send] via NET/Libfabric/3/GDRDMA
+ip-172-18-131-43:121:248 [3] NCCL INFO Channel 15/0 : 3[3] -> 11[3] [send] via NET/Libfabric/1/GDRDMA
+ip-172-18-131-43:123:253 [5] NCCL INFO Channel 13/0 : 5[5] -> 13[5] [send] via NET/Libfabric/7/GDRDMA
+ip-172-18-131-43:120:249 [2] NCCL INFO Channel 15/0 : 2[2] -> 10[2] [send] via NET/Libfabric/0/GDRDMA
+ip-172-18-131-43:118:252 [0] NCCL INFO Connected NVLS tree
+ip-172-18-131-43:118:118 [0] NCCL INFO NCCL_NVLSTREE_MAX_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:120:249 [2] NCCL INFO Connected NVLS tree
+ip-172-18-131-43:120:120 [2] NCCL INFO NCCL_NVLSTREE_MAX_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:125:254 [7] NCCL INFO Connected NVLS tree
+ip-172-18-131-43:125:125 [7] NCCL INFO NCCL_NVLSTREE_MAX_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:124:251 [6] NCCL INFO Connected NVLS tree
+ip-172-18-131-43:124:124 [6] NCCL INFO NCCL_NVLSTREE_MAX_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:122:250 [4] NCCL INFO Connected NVLS tree
+ip-172-18-131-43:122:122 [4] NCCL INFO NCCL_NVLSTREE_MAX_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:121:248 [3] NCCL INFO Connected NVLS tree
+ip-172-18-131-43:121:121 [3] NCCL INFO NCCL_NVLSTREE_MAX_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:119:247 [1] NCCL INFO Connected NVLS tree
+ip-172-18-131-43:123:253 [5] NCCL INFO Connected NVLS tree
+ip-172-18-131-43:119:119 [1] NCCL INFO NCCL_NVLSTREE_MAX_CHUNKSIZE set by environment to 524288.
+ip-172-18-131-43:123:123 [5] NCCL INFO NCCL_NVLSTREE_MAX_CHUNKSIZE set by environment to 524288.
+[rank 0] size=0.268GB t=1.87ms busBw=269.4 GB/s
+[rank 0] size=1.074GB t=5.61ms busBw=358.8 GB/s
+[rank 0] size=4.295GB t=17.66ms busBw=455.9 GB/s
+[rank 0] size=8.590GB t=33.61ms busBw=479.2 GB/s
+[rank 0] size=17.180GB t=67.25ms busBw=479.0 GB/s
+ip-172-18-131-43:118:118 [0] NCCL INFO comm 0x561001180200 rank 0 nranks 16 cudaDev 0 busId 53000 - Destroy COMPLETE
+ip-172-18-131-43:120:120 [2] NCCL INFO comm 0x558ef28733a0 rank 2 nranks 16 cudaDev 2 busId 75000 - Destroy COMPLETE
+ip-172-18-131-43:124:124 [6] NCCL INFO comm 0x561d99e42030 rank 6 nranks 16 cudaDev 6 busId b9000 - Destroy COMPLETE
+ip-172-18-131-43:125:125 [7] NCCL INFO comm 0x559549d2d340 rank 7 nranks 16 cudaDev 7 busId ca000 - Destroy COMPLETE
+ip-172-18-131-43:121:121 [3] NCCL INFO comm 0x5577e22dd100 rank 3 nranks 16 cudaDev 3 busId 86000 - Destroy COMPLETE
+ip-172-18-131-43:119:119 [1] NCCL INFO comm 0x555fb1ed74c0 rank 1 nranks 16 cudaDev 1 busId 64000 - Destroy COMPLETE
+ip-172-18-131-43:123:123 [5] NCCL INFO comm 0x55fc7cc68230 rank 5 nranks 16 cudaDev 5 busId a8000 - Destroy COMPLETE
+ip-172-18-131-43:122:122 [4] NCCL INFO comm 0x561f5d2442e0 rank 4 nranks 16 cudaDev 4 busId 97000 - Destroy COMPLETE

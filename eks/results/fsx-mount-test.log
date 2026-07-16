@@ -1,0 +1,50 @@
+=== mount check ===
++ echo '=== mount check ==='
++ mount
+/bin/bash: line 3: mount: command not found
++ grep fsx
++ true
++ df -h /fsx
+Filesystem                  Size  Used Avail Use% Mounted on
+10.44.11.140@tcp:/qoa6nb4v  1.2T  7.5M  1.2T   1% /fsx
++ echo ''
++ echo '=== write test ==='
+
+=== write test ===
+++ hostname
+/bin/bash: line 7: hostname: command not found
++ dd if=/dev/zero of=/fsx/test-.bin bs=1M count=1024 conv=fdatasync
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB, 1.0 GiB) copied, 12.8639 s, 83.5 MB/s
+
+real	0m12.972s
+user	0m0.001s
+sys	0m1.028s
++ ls -la /fsx/
+total 50
+drwxr-xr-x. 4 root root      33280 Jul 16 19:03 .
+drwxr-xr-x. 1 root root         39 Jul 16 19:03 ..
+-rw-r--r--. 1 root root 1073741824 Jul 16 19:03 test-.bin
+
+=== read test ===
++ echo ''
++ echo '=== read test ==='
+++ hostname
+/bin/bash: line 11: hostname: command not found
++ dd if=/fsx/test-.bin of=/dev/null bs=1M
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB, 1.0 GiB) copied, 1.80314 s, 595 MB/s
+
+real	0m1.841s
+user	0m0.001s
+sys	0m0.138s
++ echo ''
+
+=== cleanup ===
++ echo '=== cleanup ==='
+++ hostname
+/bin/bash: line 14: hostname: command not found
++ rm /fsx/test-.bin
++ ls /fsx/
