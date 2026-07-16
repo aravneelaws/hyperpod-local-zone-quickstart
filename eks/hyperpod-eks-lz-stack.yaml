@@ -1,0 +1,453 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Infrastructure-only stack for HyperPod EKS in an AWS Local Zone.
+  Deploys VPC, subnets (parent AZ + Local Zone), EKS cluster with core add-ons,
+  IAM role for HyperPod, and S3 bucket for lifecycle scripts.
+
+  Does NOT install helm charts and does NOT create the SageMaker HyperPod cluster.
+  Those two steps are done post-deploy by the companion scripts:
+    ./install-helm.sh           - installs the HyperPod dependency helm chart
+    ./create-hyperpod-cluster.sh - creates the AWS::SageMaker::Cluster resource
+
+  This split follows the AWS reference workshop's "Manual HyperPod Cluster Creation"
+  path, which is more robust than the Lambda-based helm installer in the reference CFN.
+
+Parameters:
+  ResourceNamePrefix:
+    Type: String
+    Default: hp-eks-lz
+    AllowedPattern: '^[a-z][a-z0-9-]{2,20}$'
+  VpcCidr:
+    Type: String
+    Default: 10.44.0.0/16
+  PublicSubnet1Cidr:
+    Type: String
+    Default: 10.44.10.0/24
+  PublicSubnet2Cidr:
+    Type: String
+    Default: 10.44.11.0/24
+  EksControlPlaneSubnet1Cidr:
+    Type: String
+    Default: 10.44.100.0/28
+  EksControlPlaneSubnet2Cidr:
+    Type: String
+    Default: 10.44.100.16/28
+  # Secondary CIDR block used exclusively for the worker subnet in the LZ.
+  WorkerSecondaryCidr:
+    Type: String
+    Default: 10.45.0.0/16
+  WorkerSubnetCidr:
+    Type: String
+    Default: 10.45.0.0/24
+  LocalZoneId:
+    Type: String
+    Default: usw2-phx2-az1
+    AllowedPattern: '^[a-z]{3,4}[0-9](-[a-z0-9]+)?-az[0-9]$'
+    Description: >
+      AZ ID of the Local Zone where p5e workers live.
+      Examples: usw2-phx2-az1 (Phoenix), use1-bos-az1 (Boston).
+  KubernetesVersion:
+    Type: String
+    Default: '1.33'
+    AllowedValues: ['1.30', '1.31', '1.32', '1.33', '1.34', '1.35']
+
+Mappings:
+  # For us-west-2 the LZ parent is us-west-2b. We put EKS control-plane
+  # subnets in this parent AZ + one other standard AZ (us-west-2a).
+  RegionAzs:
+    us-west-2:
+      StandardAz1: us-west-2a
+      StandardAz2: us-west-2b
+
+Resources:
+
+  # ==================== VPC + Subnets ====================
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-vpc
+
+  VpcSecondaryCidr:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref WorkerSecondaryCidr
+
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-igw
+
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref Igw
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnet1Cidr
+      AvailabilityZone: !FindInMap [RegionAzs, !Ref 'AWS::Region', StandardAz1]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-public-az1
+        - Key: kubernetes.io/role/elb
+          Value: '1'
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnet2Cidr
+      AvailabilityZone: !FindInMap [RegionAzs, !Ref 'AWS::Region', StandardAz2]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-public-az2
+        - Key: kubernetes.io/role/elb
+          Value: '1'
+
+  # Small /28 subnets dedicated to EKS control-plane ENIs (in standard AZs only).
+  EksSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref EksControlPlaneSubnet1Cidr
+      AvailabilityZone: !FindInMap [RegionAzs, !Ref 'AWS::Region', StandardAz1]
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-eks-cp-az1
+
+  EksSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref EksControlPlaneSubnet2Cidr
+      AvailabilityZone: !FindInMap [RegionAzs, !Ref 'AWS::Region', StandardAz2]
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-eks-cp-az2
+
+  # Worker subnet in the Local Zone (uses AvailabilityZoneId, not zone name).
+  # NOTE: this is NOT passed to the EKS control plane - EKS cannot create ENIs
+  # in a Local Zone. HyperPod attaches its workers here via
+  # AWS::SageMaker::Cluster.VpcConfig.Subnets.
+  WorkerSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: VpcSecondaryCidr
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref WorkerSubnetCidr
+      AvailabilityZoneId: !Ref LocalZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-worker-lz
+
+  # ==================== NAT + Routing ====================
+  NatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: IgwAttach
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-nat
+
+  PublicRt:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttach
+    Properties:
+      RouteTableId: !Ref PublicRt
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+
+  PublicSubnet1Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRt
+
+  PublicSubnet2Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRt
+
+  PrivateRt:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-private-rt
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRt
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  EksSubnet1Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EksSubnet1
+      RouteTableId: !Ref PrivateRt
+
+  EksSubnet2Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EksSubnet2
+      RouteTableId: !Ref PrivateRt
+
+  WorkerSubnetAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref WorkerSubnet
+      RouteTableId: !Ref PrivateRt
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PublicRt
+        - !Ref PrivateRt
+
+  # ==================== Security Group ====================
+  # EFA-friendly: intra-SG all traffic, egress 0.0.0.0/0, FSx Lustre ports.
+  # Matches AWS reference architecture pattern.
+  ClusterSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ResourceNamePrefix} EFA/HyperPod SG
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-sg
+
+  SgIngressSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: '-1'
+      SourceSecurityGroupId: !Ref ClusterSg
+
+  SgEgressSelf:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: '-1'
+      DestinationSecurityGroupId: !Ref ClusterSg
+
+  SgEgressAll:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref ClusterSg
+      IpProtocol: '-1'
+      CidrIp: 0.0.0.0/0
+
+  # ==================== IAM Roles ====================
+  EksClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ResourceNamePrefix}-eks-cluster-role-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+  # SageMaker HyperPod execution role.
+  # Same permission surface as the reference sagemaker-iam-role-stack.yaml.
+  HyperPodExecRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ResourceNamePrefix}-hp-exec-role-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSageMakerClusterInstanceRolePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      Policies:
+        - PolicyName: hp-extras
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AssignPrivateIpAddresses
+                  - ec2:CreateNetworkInterface
+                  - ec2:CreateNetworkInterfacePermission
+                  - ec2:DeleteNetworkInterface
+                  - ec2:DeleteNetworkInterfacePermission
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeVpcs
+                  - ec2:DetachNetworkInterface
+                  - ec2:ModifyNetworkInterfaceAttribute
+                  - ec2:UnassignPrivateIpAddresses
+                Resource: '*'
+              - Effect: Allow
+                Action: ec2:CreateTags
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'ec2:CreateAction': ['CreateNetworkInterface']
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetAuthorizationToken
+                  - ecr:GetDownloadUrlForLayer
+                Resource: '*'
+              - Effect: Allow
+                Action: eks-auth:AssumeRoleForPodIdentity
+                Resource: '*'
+              - Effect: Allow
+                Action: cloudwatch:DescribeAlarms
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt LifecycleBucket.Arn
+                  - !Sub ${LifecycleBucket.Arn}/*
+
+  # ==================== S3 Bucket ====================
+  LifecycleBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ResourceNamePrefix}-lifecycle-${AWS::AccountId}-${AWS::Region}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ==================== EKS Cluster + Add-ons ====================
+  EksCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Sub ${ResourceNamePrefix}-eks
+      Version: !Ref KubernetesVersion
+      RoleArn: !GetAtt EksClusterRole.Arn
+      ResourcesVpcConfig:
+        SubnetIds:
+          - !Ref EksSubnet1
+          - !Ref EksSubnet2
+        SecurityGroupIds:
+          - !Ref ClusterSg
+        EndpointPublicAccess: true
+        EndpointPrivateAccess: true
+      AccessConfig:
+        AuthenticationMode: API_AND_CONFIG_MAP
+        BootstrapClusterCreatorAdminPermissions: true
+
+  VpcCniAddon:
+    Type: AWS::EKS::Addon
+    DependsOn: EksCluster
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: vpc-cni
+      ResolveConflicts: OVERWRITE
+
+  KubeProxyAddon:
+    Type: AWS::EKS::Addon
+    DependsOn: EksCluster
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: kube-proxy
+      ResolveConflicts: OVERWRITE
+
+  CorednsAddon:
+    Type: AWS::EKS::Addon
+    DependsOn: [EksCluster, VpcCniAddon]
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: coredns
+      ResolveConflicts: OVERWRITE
+
+  PodIdentityAgentAddon:
+    Type: AWS::EKS::Addon
+    DependsOn: EksCluster
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: eks-pod-identity-agent
+      ResolveConflicts: OVERWRITE
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+    Export:
+      Name: !Sub ${AWS::StackName}-VpcId
+  WorkerSubnetId:
+    Value: !Ref WorkerSubnet
+    Description: LZ worker subnet used by the HyperPod accelerated instance group
+    Export:
+      Name: !Sub ${AWS::StackName}-WorkerSubnetId
+  SecurityGroupId:
+    Value: !Ref ClusterSg
+    Export:
+      Name: !Sub ${AWS::StackName}-SecurityGroupId
+  EksClusterName:
+    Value: !Ref EksCluster
+    Export:
+      Name: !Sub ${AWS::StackName}-EksClusterName
+  EksClusterArn:
+    Value: !GetAtt EksCluster.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-EksClusterArn
+  EksClusterEndpoint:
+    Value: !GetAtt EksCluster.Endpoint
+  HyperPodExecRoleArn:
+    Value: !GetAtt HyperPodExecRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-HyperPodExecRoleArn
+  LifecycleBucket:
+    Value: !Ref LifecycleBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-LifecycleBucket
+  KubeconfigCommand:
+    Value: !Sub aws eks update-kubeconfig --name ${EksCluster} --region ${AWS::Region}
+    Description: Run this locally to configure kubectl for this cluster
