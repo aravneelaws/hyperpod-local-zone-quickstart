@@ -1,0 +1,120 @@
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: nccl-efa
+  namespace: default
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels: {app: nccl-efa}
+        spec:
+          volumes:
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 32Gi
+          nodeSelector:
+            sagemaker.amazonaws.com/instance-group-name: accelerated
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: dshm
+                  mountPath: /dev/shm
+              env:
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: INFO}
+                # Prefer the customer-VPC ENA interface for NCCL bootstrap/OOB.
+                # Exclude loopback, docker, veth, cni, and the HyperPod agent interface.
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -ex
+                  hostname; ip -o -4 addr | head
+                  cat > /tmp/t.py <<'PY'
+                  import os, torch, torch.distributed as dist, time
+                  dist.init_process_group("nccl")
+                  rank = dist.get_rank(); world = dist.get_world_size()
+                  local_rank = int(os.environ["LOCAL_RANK"])
+                  torch.cuda.set_device(local_rank)
+                  d = torch.device(f"cuda:{local_rank}")
+                  if rank == 0:
+                      print(f"[rank 0] world={world} nccl={torch.cuda.nccl.version()}", flush=True)
+                  for sz in [1<<20, 1<<24, 1<<28, 1<<30, 1<<32, 1<<33, 1<<34]:
+                      x = torch.ones(sz//4, dtype=torch.float32, device=d)
+                      torch.cuda.synchronize(); dist.all_reduce(x); torch.cuda.synchronize()
+                      t0 = time.time()
+                      for _ in range(10): dist.all_reduce(x)
+                      torch.cuda.synchronize()
+                      el = (time.time()-t0)/10
+                      bus = 2*(world-1)/world * sz / el / 1e9
+                      if rank == 0:
+                          print(f"[rank 0] size={sz/1e9:.3f}GB t={el*1000:.2f}ms busBw={bus:.1f} GB/s", flush=True)
+                  dist.destroy_process_group()
+                  PY
+                  torchrun --nnodes=$WORLD_SIZE --node-rank=$RANK --nproc-per-node=8 --master-addr=$MASTER_ADDR --master-port=$MASTER_PORT /tmp/t.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels: {app: nccl-efa}
+        spec:
+          volumes:
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 32Gi
+          nodeSelector:
+            sagemaker.amazonaws.com/instance-group-name: accelerated
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: dshm
+                  mountPath: /dev/shm
+              env:
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: INFO}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  hostname; ip -o -4 addr | head
+                  cat > /tmp/t.py <<'PY'
+                  import os, torch, torch.distributed as dist, time
+                  dist.init_process_group("nccl")
+                  local_rank = int(os.environ["LOCAL_RANK"])
+                  torch.cuda.set_device(local_rank)
+                  d = torch.device(f"cuda:{local_rank}")
+                  for sz in [1<<20, 1<<24, 1<<28, 1<<30, 1<<32, 1<<33, 1<<34]:
+                      x = torch.ones(sz//4, dtype=torch.float32, device=d)
+                      torch.cuda.synchronize(); dist.all_reduce(x); torch.cuda.synchronize()
+                      for _ in range(10): dist.all_reduce(x)
+                      torch.cuda.synchronize()
+                  dist.destroy_process_group()
+                  PY
+                  torchrun --nnodes=$WORLD_SIZE --node-rank=$RANK --nproc-per-node=8 --master-addr=$MASTER_ADDR --master-port=$MASTER_PORT /tmp/t.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}

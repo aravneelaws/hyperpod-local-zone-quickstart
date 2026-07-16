@@ -1,8 +1,8 @@
-# HyperPod EKS on AWS Local Zones — WORKING
+# HyperPod EKS on AWS Local Zones — WORKING (validated end-to-end with full EFA multi-rail)
 
 Companion to the top-level Slurm variant. Deploys the same 2-node H200 topology, orchestrated by **EKS** instead of Slurm, in the Phoenix Local Zone (`us-west-2-phx-2a`).
 
-> **Status: working end-to-end.** VPC + EKS + helm dependencies + HyperPod cluster all deploy successfully. Nodes register as k8s nodes with `Schedulable` health status. Cross-node PyTorch DDP works (rendezvous, gradient sync). NCCL falls back to TCP-over-ENA in the default container — using an AWS Deep Learning Container with `aws-ofi-nccl` baked in is expected to restore EFA multi-rail (untested).
+> **Status: fully validated.** VPC + EKS + helm dependencies + HyperPod cluster all deploy successfully. Nodes register as k8s nodes with `Schedulable` health status. Cross-node PyTorch training works. 2-node NCCL all-reduce hits **479 GB/s busBw at 16 GB** — matching the Slurm variant to within 1%. EFA multi-rail (32 rails) works with the right container + pod spec.
 
 ## Architecture
 
@@ -71,15 +71,37 @@ kubectl describe node hyperpod-i-<id> | grep -E "nvidia.com/gpu|vpc.amazonaws.co
 # → nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32
 ```
 
-## What we tested
+## Test results
 
-- **Infrastructure**: VPC (with secondary CIDR for LZ), NAT, IGW, 4 subnets across 3 AZs (2 parent + 1 LZ)
-- **EKS**: 1.33 cluster with vpc-cni, kube-proxy, coredns, eks-pod-identity-agent add-ons
-- **Helm chart**: `hyperpod-dependencies` release installed with 17 subcharts (nvidia-device-plugin, aws-efa-k8s-device-plugin, health-monitoring-agent, kubeflow training operator, MPI operator, cert-manager, more)
-- **HyperPod cluster**: 2× ml.p5e.48xlarge in the LZ subnet, attached to EKS as `Orchestrator.Eks`
-- **Node health**: both nodes `Ready` with `Schedulable` health status, GPU topology labels applied (`network-node-layer-1/2/3`, `zone-id=usw2-phx2-az1`)
-- **Resource visibility**: `nvidia.com/gpu: 8` and `vpc.amazonaws.com/efa: 32` per node
-- **PyTorchJob**: `nccl-2node` PyTorchJob spawns 1 Master + 1 Worker pod on separate nodes, torchrun coordinates via c10d rendezvous, 16-rank all-reduce completes
+**2-node NCCL all-reduce over EFA (16 H200 GPUs across 2 pods on 2 nodes):**
+
+| Size | busBw (GB/s) |
+|---|---|
+| 1 GB | 359 |
+| 4 GB | 456 |
+| 8 GB | 479 |
+| **16 GB** | **479** |
+
+Matches the Slurm variant of this repo to within 1% at 8-16 GB.
+
+Container: `763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47` (AWS Deep Learning Container with `aws-ofi-nccl` plugin baked in).
+
+Sample manifests and logs in `results/`:
+- `nccl-efa-job.yaml` — the PyTorchJob spec that produced these numbers
+- `nccl-2node-eks-efa.log` — raw NCCL output including topology and per-size busBw
+- `nccl-2node-eks-tcp.log` — earlier run with `nvcr.io/nvidia/pytorch:24.10-py3` for comparison. NCCL falls back to TCP-over-ENA (~3.2 GB/s at 16 GB) because that image lacks `aws-ofi-nccl`.
+
+## Key pod-spec requirements for EFA on HyperPod EKS
+
+The generic `nvidia/pytorch` container will NOT get EFA performance. Three things must be right:
+
+1. **Container image** must include `aws-ofi-nccl`. AWS Deep Learning Containers (`763104351884.dkr.ecr.<region>.amazonaws.com/pytorch-training:...-ec2`) do. Vanilla `nvcr.io/nvidia/pytorch` does not.
+2. **Pod networking must be `hostNetwork: true`** with `dnsPolicy: ClusterFirstWithHostNet`. Otherwise NCCL's OOB bootstrap advertises `127.0.0.1` and cross-node ranks can't connect back to rank 0.
+3. **`/dev/shm` must be > 64 MB.** Add a Memory-backed `emptyDir` volume of ~32 GiB mounted at `/dev/shm`. Otherwise NCCL fails with `No space left on device` when allocating shared memory buffers.
+4. **`NCCL_SOCKET_IFNAME`** should exclude noise interfaces: `^lo,docker,veth,cni,pod-id-link,veth_def`. This forces NCCL to use the customer-VPC ENA interface for OOB bootstrap.
+5. **Resource requests**: `nvidia.com/gpu: 8` and `vpc.amazonaws.com/efa: 32` so the device plugins mount the devices into the container.
+
+See `results/nccl-efa-job.yaml` for the full working spec.
 
 ## Known gotchas
 
@@ -91,7 +113,9 @@ kubectl describe node hyperpod-i-<id> | grep -E "nvidia.com/gpu|vpc.amazonaws.co
 | First helm install may hit `http2: client connection lost` mid-CRD-install | Rerun with `helm uninstall`+`kubectl delete secret sh.helm.release.v1.hyperpod-dependencies.v1`+`helm install` |
 | GuardDuty auto-creates a security group in the VPC that CFN can't delete | Manually `aws ec2 delete-security-group --group-id <GuardDutyManagedSecurityGroup-*>` before stack delete |
 | CFN VPC delete blocked by EKS-installed VPC endpoints leaving orphan ENIs | Manually delete VPC endpoints, wait ~60s for ENIs to release, retry stack delete |
-| NCCL on EKS falls back to TCP without aws-ofi-nccl | Use an AWS Deep Learning Container image (763104351884.dkr.ecr.<region>.amazonaws.com/pytorch-training:...-efa or ...-gpu variants) that ships aws-ofi-nccl plugin |
+| NCCL on EKS falls back to TCP with a generic pytorch image | Use an AWS DLC image with `aws-ofi-nccl` baked in |
+| NCCL bootstrap tries `127.0.0.1` in pod network | Set `hostNetwork: true` + `dnsPolicy: ClusterFirstWithHostNet` in the pod spec |
+| NCCL `No space left on device` in `/dev/shm` | Mount a Memory-backed emptyDir (~32 GiB) at `/dev/shm` |
 
 ## Teardown
 
