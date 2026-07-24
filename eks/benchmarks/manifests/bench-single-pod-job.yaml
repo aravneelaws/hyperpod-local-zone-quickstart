@@ -1,0 +1,65 @@
+# Per-pod benchmark Job (non-distributed): T1a, T1c, T2a
+# Mounts a single storage backend at /data and writes results to a shared results volume.
+# The exact backend is chosen by which PVC is bound to the "data" volume when applying.
+#
+# Environment variables control behavior:
+#   BACKEND  - label written to result JSON (e.g. "fsx-lz", "fsx-parent", "s3mp-single", "s3mp-multi")
+#   DATASET  - subpath under /data ("openalex" or "openfold-pdb")
+#   BENCH    - comma-separated list of benchmarks ("t1a,t1c,t2a" for single-pod set)
+#   RUNID    - a unique run identifier (auto-generated if empty)
+#
+# The pod's ConfigMap ddp-bench-py holds the Python driver. Ensure it's created:
+#   kubectl create configmap ddp-bench-py --from-file=bench.py=eks/benchmarks/bench.py
+#
+# Apply pattern (repeat with different envs for each backend x dataset combination):
+#   BACKEND=fsx-lz DATASET=openfold-pdb envsubst < bench-single-pod-job.yaml | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bench-${BACKEND}-${DATASET}-${BENCH_SLUG}
+  namespace: default
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: bench
+        backend: ${BACKEND}
+        dataset: ${DATASET}
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        sagemaker.amazonaws.com/instance-group-name: accelerated
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ${DATA_PVC}
+        - name: results
+          persistentVolumeClaim:
+            claimName: fsx-lz-pvc  # always write results to LZ FSx (fastest, always mounted)
+        - name: bench-script
+          configMap:
+            name: ddp-bench-py
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: 8Gi}
+      containers:
+        - name: bench
+          image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: BACKEND, value: "${BACKEND}"}
+            - {name: DATASET, value: "${DATASET}"}
+            - {name: BENCH, value: "${BENCH}"}
+            - {name: RUNID, value: "${RUNID}"}
+            - {name: DATA_ROOT, value: "/data"}
+            - {name: RESULTS_ROOT, value: "/results/${BACKEND}"}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: results, mountPath: /results}
+            - {name: bench-script, mountPath: /workspace, readOnly: true}
+            - {name: dshm, mountPath: /dev/shm}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -ex
+              python /workspace/bench.py
