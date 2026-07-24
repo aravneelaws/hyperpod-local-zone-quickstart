@@ -112,6 +112,44 @@ kubectl get csidrivers 2>&1 | grep -E "NAME|fsx"
 kubectl get pods -n kube-system 2>&1 | grep fsx
 
 echo ""
+echo "=== Done with FSx CSI driver. Next: S3 Mountpoint CSI driver ==="
+echo ""
+
+# ---------- Install aws-mountpoint-s3-csi-driver ----------
+# Only needed if using S3 Mountpoint as a storage backend (in addition to,
+# or instead of, FSx Lustre). Skip by setting SKIP_S3_MOUNTPOINT_CSI=1.
+if [ "${SKIP_S3_MOUNTPOINT_CSI:-0}" = "1" ]; then
+  echo "=== SKIP_S3_MOUNTPOINT_CSI=1, skipping S3 Mountpoint CSI install ==="
+else
+  echo "=== Adding aws-mountpoint-s3-csi-driver helm repo ==="
+  helm repo add aws-mountpoint-s3-csi-driver https://awslabs.github.io/mountpoint-s3-csi-driver >/dev/null 2>&1 || true
+  helm repo update >/dev/null 2>&1
+
+  echo ""
+  echo "=== helm upgrade --install aws-mountpoint-s3-csi-driver ==="
+  # --wait can time out if there are no worker nodes yet (DaemonSet has nothing to schedule onto).
+  # Retry without --wait to still complete the release install.
+  if ! helm upgrade --install aws-mountpoint-s3-csi-driver aws-mountpoint-s3-csi-driver/aws-mountpoint-s3-csi-driver \
+        --namespace kube-system --wait --timeout 5m 2>/dev/null; then
+    echo "First install attempt (--wait) timed out; retrying without --wait..."
+    helm upgrade --install aws-mountpoint-s3-csi-driver aws-mountpoint-s3-csi-driver/aws-mountpoint-s3-csi-driver \
+      --namespace kube-system
+  fi
+
+  echo ""
+  echo "=== Verify S3 Mountpoint CSI driver ==="
+  kubectl get csidrivers 2>&1 | grep -E "NAME|s3"
+  kubectl get sa -n kube-system s3-csi-driver-sa 2>&1
+
+  echo ""
+  echo "NOTE: The S3 Mountpoint CSI driver's ServiceAccount (s3-csi-driver-sa)"
+  echo "      needs Pod Identity association with an IAM role that has S3"
+  echo "      permissions on the target bucket. If you deployed the CFN stack"
+  echo "      with CreateS3MountpointBucket=true, the association is already"
+  echo "      wired up by CFN (see stack output S3MountpointRoleArn)."
+fi
+
+echo ""
 echo "=== Done. Next steps: ==="
 echo "  1. Apply the static FSx PV/PVC: ./create-fsx-pv.sh (auto-generated from stack outputs)"
 echo "  2. Create the HyperPod cluster: ./create-hyperpod-cluster.sh"
