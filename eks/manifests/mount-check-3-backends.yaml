@@ -24,6 +24,8 @@ spec:
       args:
         - |
           set -e
+          # amazonlinux:2023 lacks `hostname` binary; use uname -n
+          HN=$(uname -n)
           echo "=== Mounts ==="
           df -h /fsx-parent /fsx-lz /s3mp 2>&1 || true
           echo ""
@@ -37,9 +39,9 @@ spec:
           done
           echo "=== Quick write tests (writable backends only) ==="
           for path in /fsx-lz /s3mp; do
-            TESTFILE="$path/mount-check-$(hostname)-$$"
+            TESTFILE="$path/mount-check-$HN-$$"
             echo "test on $path -> $TESTFILE"
-            if ! echo "hello from $(hostname)" > "$TESTFILE"; then
+            if ! echo "hello from $HN" > "$TESTFILE"; then
               echo "WRITE_FAILED: $path"
               exit 1
             fi
@@ -51,7 +53,7 @@ spec:
           done
           echo ""
           echo "=== FSx-parent write test (best-effort; may fail if capacity full) ==="
-          FSXPARENT_TESTFILE="/fsx-parent/mount-check-$(hostname)-$$"
+          FSXPARENT_TESTFILE="/fsx-parent/mount-check-$HN-$$"
           if echo "hello" > "$FSXPARENT_TESTFILE" 2>&1; then
             cat "$FSXPARENT_TESTFILE" >/dev/null
             rm "$FSXPARENT_TESTFILE"
