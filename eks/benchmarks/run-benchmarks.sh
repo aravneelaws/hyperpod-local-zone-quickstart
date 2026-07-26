@@ -26,12 +26,13 @@ export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}
 
 RUNID=${RUNID:-$(date +%Y%m%d-%H%M%S)}
 
-# Backends: label -> PVC name -> multi-nic flag (yes/no)
+# Backends: label -> PVC name
+# Note: multi-NIC S3 Mountpoint deferred (requires HyperPod lifecycle script
+# to attach secondary ENAs on p5e's other network cards; see benchmark.md).
 BACKENDS=(
   "fsx-parent:fsx-lustre-pvc"
   "fsx-lz:fsx-lz-pvc"
   "s3mp-single:s3mp-pvc"
-  "s3mp-multi:s3mp-multinic-pvc"
 )
 DATASETS=(openalex openfold-pdb)
 
@@ -51,7 +52,7 @@ run_single_pod() {
     DATA_PVC="${backend_pvc##*:}"
     for DATASET in "${DATASETS[@]}"; do
       echo ""
-      echo "=== Running $BENCH_LIST on backend=$BACKEND dataset=$DATASET ==="
+      echo "=== Running $bench_list on backend=$BACKEND dataset=$DATASET ==="
       export BACKEND DATA_PVC DATASET RUNID BENCH="$bench_list" BENCH_SLUG="$bench_slug"
       envsubst < "$MANIFEST_SINGLE" | kubectl apply -f -
       JOB_NAME="bench-${BACKEND}-${DATASET}-${bench_slug}"
