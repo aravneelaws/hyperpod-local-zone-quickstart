@@ -189,6 +189,15 @@ To run the DDP smoke test yourself:
 ./run-ddp-smoke-test.sh reset    # wipe checkpoints, start fresh
 ```
 
+## Storage backend benchmarks
+
+Beyond the smoke tests above, this repo includes a **storage backend benchmark
+suite** that compares FSx Lustre (parent AZ + LZ) vs. S3 Mountpoint
+(single-NIC + multi-NIC) across two datasets with different access patterns
+(large-shard LLM-style vs. small-file Boltz-style). See
+[`benchmarks/benchmark.md`](benchmarks/benchmark.md) for the experimental
+setup, methodology, and results.
+
 ## Key pod-spec requirements for EFA on HyperPod EKS
 
 The generic `nvidia/pytorch` container will NOT get EFA performance. Three things must be right:
