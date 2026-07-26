@@ -194,7 +194,7 @@ To run the DDP smoke test yourself:
 Beyond the smoke tests above, this repo includes a **storage backend benchmark
 suite** that compares FSx Lustre (parent AZ + LZ) vs. S3 Mountpoint
 (single-NIC + multi-NIC) across two datasets with different access patterns
-(large-shard LLM-style vs. small-file Boltz-style). See
+(large-shard sequential vs. small-file-per-sample). See
 [`benchmarks/benchmark.md`](benchmarks/benchmark.md) for the experimental
 setup, methodology, and results.
 

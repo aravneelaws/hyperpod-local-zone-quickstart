@@ -6,14 +6,13 @@ Comparing storage-backend options for HyperPod training in an AWS Local Zone: FS
 
 ## Why this benchmark exists
 
-An AWS specialist on the account told a customer (Boltz) that on a p5e.48xlarge instance, **multi-NIC S3 Mountpoint should theoretically reach 200 Gbps (25 GB/s) reading from S3**. This benchmark is intended to empirically validate or refute that claim on real p5e hardware.
+Training workloads in AWS Local Zones face several storage tradeoffs that aren't well-characterized in public documentation:
 
-More broadly, downstream customers are choosing between:
-- FSx Lustre in the LZ (recently enabled by AWS in Phoenix LZ, PERSISTENT_2 up to 250 MB/s per TiB)
-- FSx Lustre in the parent AZ (cross-zone mounted from LZ workers — what customers used before LZ FSx was available)
-- S3 Mountpoint (cheaper, no fixed-capacity commitment, but is it fast enough?)
+- **FSx Lustre in Local Zones is a recent addition** (Phoenix LZ now supports PERSISTENT_2 at 125 or 250 MB/s per TiB). Previously, FSx had to be provisioned in the parent AZ and cross-zone mounted — which introduces network hops that affect metadata and small-file operations.
+- **S3 Mountpoint** offers a fundamentally different storage model (object storage as a filesystem) with different scaling characteristics: no fixed capacity commitment, pay-per-request pricing, and — with recent versions — the ability to fan out requests across multiple network interfaces.
+- **Multi-NIC S3 Mountpoint** (via `--bind` in mountpoint-s3 v1.9.0+) is theoretically capable of saturating aggregate instance bandwidth on p5-class hardware, but this capability is officially labeled work-in-progress and lacks public benchmarks on modern GPU instances.
 
-We give a specific, reproducible answer for each backend against two representative workload shapes.
+For a customer deploying HyperPod in an LZ with production-scale training data, the question is concrete: **which storage backend delivers the best throughput, latency, and cost tradeoff for a given workload shape?** This benchmark produces reproducible numbers to answer that.
 
 ## What we are measuring
 
@@ -31,7 +30,7 @@ For each combination of **storage backend × dataset × test**, we record throug
 **Notes:**
 - FSx Lustre is not offered in most Local Zones. Phoenix is a recent exception (PERSISTENT_2 at 125 or 250 MB/s per TiB), which is why LZ FSx is a first-class backend under test.
 - The **parent-AZ FSx** sits at 1.2 TiB rather than 2.4 TiB because the resize operation returned `insufficient capacity in this availability zone` twice. Its ceiling is 300 MB/s vs. LZ FSx's 600 MB/s — a real disadvantage worth noting; a real customer could hit the same.
-- **Multi-NIC S3 Mountpoint** is a work-in-progress feature in `mountpoint-s3` (added in v1.9.0, still officially labeled WIP as of v1.23.0). It requires passing `--bind <IFACE>` through pod `mountOptions` in the PV spec. No AWS-published benchmark currently validates the theoretical 200 Gbps / 25 GB/s per p5e — this benchmark is intended to produce that data.
+- **Multi-NIC S3 Mountpoint** is a work-in-progress feature in `mountpoint-s3` (added in v1.9.0, still officially labeled WIP as of v1.23.0). It requires passing `--bind <IFACE>` through pod `mountOptions` in the PV spec. Public benchmarks on p5-class GPU instances are limited; producing quantitative numbers here is a primary motivation for this benchmark.
 
 ### Datasets under test (two)
 
@@ -40,7 +39,7 @@ Both datasets pre-loaded into the S3 Mountpoint bucket and made visible in both 
 | Dataset | Access pattern | Size | Files | Median file size | Source |
 |---|---|---|---|---|---|
 | **`openalex`** | Large sequential shards (LLM/HPC-style) | ~600 GB | 2,008 | 184 MB | `s3://openalex/data/parquet/works/updated_date=2025-*` + 2026-01..05 |
-| **`openfold-pdb`** | Small-file per sample (Boltz/protein-training-style) | ~644 GB | 524,453 | ~1.2 MB (4 files per PDB chain: 3 MSA hits + 1 template hits) | `s3://openfold/pdb/` |
+| **`openfold-pdb`** | Small-file per sample (structure-prediction / bioinformatics style) | ~644 GB | 524,453 | ~1.2 MB (4 files per PDB chain: 3 MSA hits + 1 template hits) | `s3://openfold/pdb/` |
 
 Why two datasets: file-size distribution and access pattern dominate storage performance far more than the actual bytes. A single dataset gives a single answer. **Two datasets bracket the space** — `openalex` favors sequential-read backends (S3 Mountpoint should shine), `openfold-pdb` favors metadata-rich backends (FSx should shine).
 
@@ -69,7 +68,7 @@ Each test writes a structured JSON result per pod invocation to `/results/<backe
 #### T2a — Small-file metadata operations
 
 - **What**: One pod enumerates up to 10,000 files under the dataset root, then calls `stat()` on each. Also runs an `os.walk()` over the tree, counting up to 50,000 files.
-- **Why**: The classic FSx-vs-S3 differentiator. Filesystems handle metadata operations fundamentally differently from object stores. Small-file-per-sample training pipelines (Boltz, ProteinGym, most image-classification pipelines) can be dominated by metadata cost, not I/O throughput.
+- **Why**: The classic FSx-vs-S3 differentiator. Filesystems handle metadata operations fundamentally differently from object stores. Small-file-per-sample training pipelines (structure prediction, ProteinGym, most image-classification pipelines) can be dominated by metadata cost, not I/O throughput.
 - **Reports**: `stat_ops_per_sec`, `walk_files_per_sec`, `stat_errors`, wall-clock for each phase.
 
 ### What we are NOT measuring (yet)
@@ -88,9 +87,9 @@ Assuming the infra from [`../README.md`](../README.md) is up (2 p5e nodes, all 4
 export AWS_PROFILE=<profile> AWS_DEFAULT_REGION=us-west-2
 cd eks/benchmarks
 
-# Sanity check first: mount 3 backends in one pod, verify each writes+reads
-kubectl apply -f ../manifests/mount-check-3-backends.yaml
-kubectl logs -f mount-check-3
+# Sanity check first: mount 4 backends in one pod, verify each writes+reads
+kubectl apply -f ../manifests/mount-check-4-backends.yaml
+kubectl logs -f mount-check-4
 # Expect: "ALL BACKENDS WORKING" as the last output line
 
 # Run the single-pod tests (T1a, T1c, T2a): 8 combinations (4 backends × 2 datasets)
@@ -129,7 +128,7 @@ Files in this directory:
 | parent-AZ FSx | TBD | TBD |
 | LZ FSx | TBD | TBD |
 | S3 Mountpoint single-NIC | TBD | TBD |
-| S3 Mountpoint multi-NIC | TBD | TBD (target: ~25 GB/s if colleague's claim holds) |
+| S3 Mountpoint multi-NIC | TBD | TBD |
 
 ### T1c — Single-stream 5 GiB write (MB/s)
 
@@ -153,7 +152,7 @@ Files in this directory:
 
 Once results are in, we'll answer:
 
-1. **Large-shard sequential workloads (openalex-like)** — which backend scales best in aggregate throughput? Does multi-NIC S3 Mountpoint approach or exceed FSx? Does it reach the specialist-projected 25 GB/s?
+1. **Large-shard sequential workloads (openalex-like)** — which backend scales best in aggregate throughput? How close does multi-NIC S3 Mountpoint get to saturating p5e's aggregate network bandwidth?
 2. **Small-file-per-sample workloads (openfold-pdb-like)** — is FSx's metadata advantage decisive, or can S3 Mountpoint be workable with the right prefetching?
 3. **Checkpoint writes** — is FSx materially faster than S3 for single-rank rank-0 saves? If so, does that push a customer toward sharded parallel writes as a workaround?
 4. **Cost/perf tradeoff** — for a given workload shape, does the throughput difference justify FSx's higher $/GB-month? (Compared against S3 Standard pricing + Mountpoint request costs.)

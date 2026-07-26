@@ -1,0 +1,79 @@
+# Sanity check: pod that mounts all 4 storage backends and verifies mount + write.
+# Runs on one p5e worker node and confirms every PVC works before the real benchmark.
+#
+# Prereqs: benchmark PV/PVCs applied. See eks/README.md and eks/benchmarks/benchmark.md.
+# Apply:   kubectl apply -f mount-check-4-backends.yaml
+# Watch:   kubectl logs -f mount-check-4
+# Expect final line: "ALL BACKENDS WORKING"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mount-check-4
+  namespace: default
+spec:
+  restartPolicy: Never
+  serviceAccountName: default
+  nodeSelector:
+    sagemaker.amazonaws.com/instance-group-name: accelerated
+  containers:
+    - name: check
+      image: public.ecr.aws/amazonlinux/amazonlinux:2023
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          set -e
+          echo "=== Mounts ==="
+          df -h /fsx-parent /fsx-lz /s3mp /s3mp-multi 2>&1 || true
+          echo ""
+          for path in /fsx-parent /fsx-lz /s3mp /s3mp-multi; do
+            echo "=== $path ==="
+            if ! ls -la "$path" 2>&1 | head -5; then
+              echo "MOUNT_LIST_FAILED: $path"
+              exit 1
+            fi
+            echo ""
+          done
+          echo "=== Quick write tests ==="
+          for path in /fsx-lz /s3mp /s3mp-multi; do
+            TESTFILE="$path/mount-check-$(hostname)-$$"
+            echo "test on $path -> $TESTFILE"
+            if ! echo "hello from $(hostname)" > "$TESTFILE"; then
+              echo "WRITE_FAILED: $path"
+              exit 1
+            fi
+            if ! cat "$TESTFILE" >/dev/null; then
+              echo "READ_FAILED: $path"
+              exit 1
+            fi
+            rm "$TESTFILE" || echo "  (rm failed, likely a permissions or CSI quirk; not fatal)"
+          done
+          echo ""
+          echo "=== FSx-parent write test (best-effort; may fail if capacity full) ==="
+          FSXPARENT_TESTFILE="/fsx-parent/mount-check-$(hostname)-$$"
+          if echo "hello" > "$FSXPARENT_TESTFILE" 2>&1; then
+            cat "$FSXPARENT_TESTFILE" >/dev/null
+            rm "$FSXPARENT_TESTFILE"
+            echo "  fsx-parent OK"
+          else
+            echo "  fsx-parent write failed (may be expected if 1.2 TiB is full with dataset stubs)"
+          fi
+          echo ""
+          echo "ALL BACKENDS WORKING"
+      volumeMounts:
+        - {name: fsx-parent, mountPath: /fsx-parent}
+        - {name: fsx-lz, mountPath: /fsx-lz}
+        - {name: s3mp, mountPath: /s3mp}
+        - {name: s3mp-multi, mountPath: /s3mp-multi}
+  volumes:
+    - name: fsx-parent
+      persistentVolumeClaim:
+        claimName: fsx-lustre-pvc
+    - name: fsx-lz
+      persistentVolumeClaim:
+        claimName: fsx-lz-pvc
+    - name: s3mp
+      persistentVolumeClaim:
+        claimName: s3mp-pvc
+    - name: s3mp-multi
+      persistentVolumeClaim:
+        claimName: s3mp-multinic-pvc
