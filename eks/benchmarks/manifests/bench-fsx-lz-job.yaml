@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bench-${BACKEND}-${DATASET}-${BENCH_SLUG}
+  namespace: default
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: bench
+        backend: ${BACKEND}
+        dataset: ${DATASET}
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        sagemaker.amazonaws.com/instance-group-name: accelerated
+      volumes:
+        # Single mount for backend=fsx-lz because both data and results live
+        # here. Mounting the same PVC twice on a fresh node caused kubelet
+        # ContainerCreating deadlocks on the FSx CSI driver.
+        - name: fsxlz
+          persistentVolumeClaim:
+            claimName: fsx-lz-pvc
+        - name: bench-script
+          configMap:
+            name: ddp-bench-py
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: 8Gi}
+      containers:
+        - name: bench
+          image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: BACKEND, value: "${BACKEND}"}
+            - {name: DATASET, value: "${DATASET}"}
+            - {name: BENCH, value: "${BENCH}"}
+            - {name: RUNID, value: "${RUNID}"}
+            - {name: DATA_ROOT, value: "/mnt/fsxlz"}
+            - {name: RESULTS_ROOT, value: "/mnt/fsxlz/${BACKEND}"}
+          volumeMounts:
+            - {name: fsxlz, mountPath: /mnt/fsxlz}
+            - {name: bench-script, mountPath: /workspace, readOnly: true}
+            - {name: dshm, mountPath: /dev/shm}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -ex
+              mkdir -p /mnt/fsxlz/${BACKEND}
+              python /workspace/bench.py

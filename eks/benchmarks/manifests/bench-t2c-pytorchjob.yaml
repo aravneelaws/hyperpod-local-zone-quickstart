@@ -1,12 +1,15 @@
-# Distributed T1b benchmark: 2 nodes x 8 ranks = 16 ranks reading in parallel.
-# Same pod spec approach as our proven NCCL/DDP jobs.
+# T2c training-pipeline benchmark for backend=s3mp-single or fsx-parent.
+# Uses two separate PVCs (data + results). Won't work for fsx-lz backend since
+# that would double-mount the same PVC — use bench-t2c-fsx-lz-pytorchjob.yaml
+# for fsx-lz.
 #
-# Variables substituted at apply time:
-#   BACKEND, DATASET, DATA_PVC, RUNID
+# Envsubst-substituted: BACKEND, DATA_PVC, DATASET, RUNID, NUM_WORKERS,
+# PREFETCH_FACTOR, SAMPLE_MODE, JOB_SUFFIX
+# JOB_SUFFIX lets you run multiple variants in parallel (e.g. -nw8-pf8-partial).
 apiVersion: kubeflow.org/v1
 kind: PyTorchJob
 metadata:
-  name: bench-t1b-${BACKEND}-${DATASET}
+  name: bench-t2c-${BACKEND}-${DATASET}${JOB_SUFFIX}
   namespace: default
 spec:
   pytorchReplicaSpecs:
@@ -14,10 +17,10 @@ spec:
       replicas: 1
       restartPolicy: OnFailure
       template:
-        metadata: {labels: {app: bench-t1b, backend: "${BACKEND}", dataset: "${DATASET}"}}
+        metadata: {labels: {app: bench-t2c, backend: "${BACKEND}", dataset: "${DATASET}"}}
         spec:
           nodeSelector:
-            sagemaker.amazonaws.com/instance-group-name: accelerated
+            sagemaker.amazonaws.com/compute-type: hyperpod
           restartPolicy: OnFailure
           hostNetwork: true
           dnsPolicy: ClusterFirstWithHostNet
@@ -29,8 +32,7 @@ spec:
               persistentVolumeClaim:
                 claimName: fsx-lz-pvc
             - name: bench-script
-              configMap:
-                name: ddp-bench-py
+              configMap: {name: ddp-bench-t2c-py}
             - name: dshm
               emptyDir: {medium: Memory, sizeLimit: 32Gi}
           containers:
@@ -40,10 +42,14 @@ spec:
               env:
                 - {name: BACKEND, value: "${BACKEND}"}
                 - {name: DATASET, value: "${DATASET}"}
-                - {name: BENCH, value: "t1b"}
                 - {name: RUNID, value: "${RUNID}"}
                 - {name: DATA_ROOT, value: "/data"}
                 - {name: RESULTS_ROOT, value: "/results/${BACKEND}"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: SAMPLE_MODE, value: "${SAMPLE_MODE}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
                 - {name: FI_PROVIDER, value: efa}
                 - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
                 - {name: NCCL_DEBUG, value: WARN}
@@ -57,13 +63,14 @@ spec:
               args:
                 - |
                   set -ex
+                  mkdir -p /results/${BACKEND}
                   torchrun \
                     --nnodes=$WORLD_SIZE \
                     --node-rank=$RANK \
                     --nproc-per-node=8 \
                     --master-addr=$MASTER_ADDR \
                     --master-port=$MASTER_PORT \
-                    /workspace/bench.py
+                    /workspace/bench_t2c.py
               resources:
                 limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
                 requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
@@ -71,10 +78,10 @@ spec:
       replicas: 1
       restartPolicy: OnFailure
       template:
-        metadata: {labels: {app: bench-t1b, backend: "${BACKEND}", dataset: "${DATASET}"}}
+        metadata: {labels: {app: bench-t2c, backend: "${BACKEND}", dataset: "${DATASET}"}}
         spec:
           nodeSelector:
-            sagemaker.amazonaws.com/instance-group-name: accelerated
+            sagemaker.amazonaws.com/compute-type: hyperpod
           restartPolicy: OnFailure
           hostNetwork: true
           dnsPolicy: ClusterFirstWithHostNet
@@ -86,8 +93,7 @@ spec:
               persistentVolumeClaim:
                 claimName: fsx-lz-pvc
             - name: bench-script
-              configMap:
-                name: ddp-bench-py
+              configMap: {name: ddp-bench-t2c-py}
             - name: dshm
               emptyDir: {medium: Memory, sizeLimit: 32Gi}
           containers:
@@ -97,10 +103,14 @@ spec:
               env:
                 - {name: BACKEND, value: "${BACKEND}"}
                 - {name: DATASET, value: "${DATASET}"}
-                - {name: BENCH, value: "t1b"}
                 - {name: RUNID, value: "${RUNID}"}
                 - {name: DATA_ROOT, value: "/data"}
                 - {name: RESULTS_ROOT, value: "/results/${BACKEND}"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: SAMPLE_MODE, value: "${SAMPLE_MODE}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
                 - {name: FI_PROVIDER, value: efa}
                 - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
                 - {name: NCCL_DEBUG, value: WARN}
@@ -114,13 +124,14 @@ spec:
               args:
                 - |
                   set -ex
+                  mkdir -p /results/${BACKEND}
                   torchrun \
                     --nnodes=$WORLD_SIZE \
                     --node-rank=$RANK \
                     --nproc-per-node=8 \
                     --master-addr=$MASTER_ADDR \
                     --master-port=$MASTER_PORT \
-                    /workspace/bench.py
+                    /workspace/bench_t2c.py
               resources:
                 limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
                 requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}

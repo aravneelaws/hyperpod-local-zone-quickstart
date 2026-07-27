@@ -67,10 +67,19 @@ def _emit(test: str, metrics: dict) -> None:
     print(f"[{test}] {json.dumps(metrics)}", flush=True)
 
 
-def _list_files(root: Path, min_size: int = 0, max_files: int = 5000) -> list[Path]:
-    """List files under root with size >= min_size, up to max_files. Cached across benchmarks."""
+def _list_files(root: Path, min_size: int = 0, max_files: int = 5000, time_limit_sec: float = 60.0) -> list[Path]:
+    """List files under root with size >= min_size, up to max_files or time_limit_sec.
+
+    Bounded by both count and time. On lazy-hydrated backends (FSx with DRA to
+    S3), a full walk can take hours because each stat triggers an S3 fetch. So
+    we cap walk duration.
+    """
     out = []
+    t0 = time.time()
     for p in root.rglob("*"):
+        if time.time() - t0 > time_limit_sec:
+            print(f"[_list_files] time limit reached ({time_limit_sec}s); returning {len(out)} files scanned so far", flush=True)
+            break
         if not p.is_file():
             continue
         try:
@@ -89,7 +98,9 @@ def t1a_single_pod_read() -> None:
     target_bytes = 4 * 1024 * 1024 * 1024  # 4 GiB
 
     print(f"[t1a] scanning {DATASET_PATH} for a large file (>= 512 MiB)...", flush=True)
-    large_files = _list_files(DATASET_PATH, min_size=512 * 1024 * 1024, max_files=100)
+    # Bounded scan: give up after 30s if no large file found — most likely the
+    # dataset is small-file-only. We'll fall back to many-small-files read.
+    large_files = _list_files(DATASET_PATH, min_size=512 * 1024 * 1024, max_files=10, time_limit_sec=30.0)
 
     if large_files:
         # Use the largest single file to hit the target
@@ -115,11 +126,14 @@ def t1a_single_pod_read() -> None:
             "mode": "single-large-file",
         })
     else:
-        # Fall back: read many files sequentially until we hit target bytes
+        # Fall back: read many files sequentially until we hit target bytes.
+        # Bounded: cap enumeration at 20k files or 90s (whichever comes first)
+        # so we don't get stuck rglob'ing 500k+ files on cold FSx-via-DRA.
         print("[t1a] no single large file; falling back to many-small-files read", flush=True)
-        all_files = _list_files(DATASET_PATH, min_size=1, max_files=100_000)
+        all_files = _list_files(DATASET_PATH, min_size=1, max_files=20_000, time_limit_sec=90.0)
         print(f"[t1a] enumerated {len(all_files)} files", flush=True)
-        random.shuffle(all_files)
+        # NOTE: intentionally NOT shuffling. Sequential read of first-N-files
+        # gives a deterministic, comparable measurement across backends.
         t0 = time.time()
         bytes_read = 0
         files_read = 0
@@ -189,7 +203,8 @@ def t1c_single_stream_write() -> None:
 def t2a_metadata() -> None:
     """stat() 10k files + ls -R the dataset root."""
     print(f"[t2a] enumerating first 10000 files in {DATASET_PATH}", flush=True)
-    all_files = _list_files(DATASET_PATH, min_size=0, max_files=10_000)
+    # For metadata benchmark, we can spend more time on the initial walk
+    all_files = _list_files(DATASET_PATH, min_size=0, max_files=10_000, time_limit_sec=120.0)
     print(f"[t2a] found {len(all_files)}, running stat()", flush=True)
 
     t0 = time.time()
@@ -204,11 +219,18 @@ def t2a_metadata() -> None:
     stat_elapsed = time.time() - t0
 
     # ls -R style: recursive iteration counting directories/files
-    print("[t2a] walking directory tree", flush=True)
+    # Bounded: 120s walk budget. On cold FSx-via-DRA with 500k+ files, unbounded
+    # walk can take hours.
+    print("[t2a] walking directory tree (max 120s)", flush=True)
     t0 = time.time()
     dirs = 0
     files = 0
+    walk_timed_out = False
     for dirpath, dirnames, filenames in os.walk(DATASET_PATH):
+        if time.time() - t0 > 120.0:
+            walk_timed_out = True
+            print(f"[t2a] walk time limit reached; scanned {dirs} dirs and {files} files", flush=True)
+            break
         dirs += 1
         files += len(filenames)
         # Cap walk to a reasonable subset to avoid multi-hour walks on 500k+ files
@@ -241,7 +263,7 @@ def t1b_parallel_read() -> None:
     rank = dist.get_rank()
     world = dist.get_world_size()
 
-    all_files = _list_files(DATASET_PATH, min_size=1024 * 1024, max_files=100_000)  # >= 1 MiB
+    all_files = _list_files(DATASET_PATH, min_size=1024 * 1024, max_files=20_000, time_limit_sec=90.0)  # >= 1 MiB
     if rank == 0:
         print(f"[t1b] world={world} total_files={len(all_files)}", flush=True)
     dist.barrier()
