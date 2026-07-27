@@ -27,12 +27,13 @@ export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}
 RUNID=${RUNID:-$(date +%Y%m%d-%H%M%S)}
 
 # Backends: label -> PVC name
-# Note: multi-NIC S3 Mountpoint deferred (requires HyperPod lifecycle script
-# to attach secondary ENAs on p5e's other network cards; see benchmark.md).
+# Order matters — first entries run first. S3 Mountpoint first because it's
+# the customer-preferred backend and has no cold-cache issues (no lazy
+# hydration). LZ FSx next. Parent-AZ FSx (cross-zone, likely slowest) last.
 BACKENDS=(
-  "fsx-parent:fsx-lustre-pvc"
-  "fsx-lz:fsx-lz-pvc"
   "s3mp-single:s3mp-pvc"
+  "fsx-lz:fsx-lz-pvc"
+  "fsx-parent:fsx-lustre-pvc"
 )
 DATASETS=(openalex openfold-pdb)
 
@@ -52,15 +53,20 @@ run_single_pod() {
     DATA_PVC="${backend_pvc##*:}"
     for DATASET in "${DATASETS[@]}"; do
       echo ""
-      echo "=== Running $bench_list on backend=$BACKEND dataset=$DATASET ==="
+      echo "=== [$(date +%H:%M:%S)] Running $bench_list on backend=$BACKEND dataset=$DATASET ==="
       export BACKEND DATA_PVC DATASET RUNID BENCH="$bench_list" BENCH_SLUG="$bench_slug"
-      envsubst < "$MANIFEST_SINGLE" | kubectl apply -f -
       JOB_NAME="bench-${BACKEND}-${DATASET}-${bench_slug}"
-      echo "Job: $JOB_NAME"
-      kubectl wait --for=condition=complete --timeout=30m job/"$JOB_NAME" 2>&1 || {
-        echo "Job $JOB_NAME did not complete cleanly; check logs:"
-        kubectl logs -l job-name="$JOB_NAME" --tail=50
-      }
+      # Delete any prior Job with this name so we can re-apply cleanly
+      kubectl delete job "$JOB_NAME" --ignore-not-found --wait=true 2>&1 >/dev/null
+      envsubst < "$MANIFEST_SINGLE" | kubectl apply -f -
+      echo "Job: $JOB_NAME (max 15 min)"
+      # Wait with a HARD 15-min cap; on timeout kill the Job and its pod so we move on
+      if ! kubectl wait --for=condition=complete --timeout=15m job/"$JOB_NAME" 2>&1; then
+        echo "TIMEOUT: killing $JOB_NAME to unblock next job"
+        kubectl delete job "$JOB_NAME" --wait=false --grace-period=0 --force 2>&1 >/dev/null
+        # Force-delete any lingering pod
+        kubectl get pods -l job-name="$JOB_NAME" -o name 2>/dev/null | xargs -r kubectl delete --wait=false --grace-period=0 --force 2>&1 >/dev/null
+      fi
     done
   done
 }
