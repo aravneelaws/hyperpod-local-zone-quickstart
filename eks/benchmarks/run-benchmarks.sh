@@ -27,9 +27,9 @@ export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}
 RUNID=${RUNID:-$(date +%Y%m%d-%H%M%S)}
 
 # Backends: label -> PVC name
-# Order matters — first entries run first. S3 Mountpoint first because it's
-# the customer-preferred backend and has no cold-cache issues (no lazy
-# hydration). LZ FSx next. Parent-AZ FSx (cross-zone, likely slowest) last.
+# Order matters — first entries run first. S3 Mountpoint first because it
+# has no cold-cache issues (no lazy hydration). LZ FSx next. Parent-AZ FSx
+# (cross-zone, likely slowest) last.
 BACKENDS=(
   "s3mp-single:s3mp-pvc"
   "fsx-lz:fsx-lz-pvc"
