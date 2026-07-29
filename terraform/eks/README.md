@@ -81,12 +81,15 @@ The worker subnet CIDR is associated as its own secondary VPC block.
 > AZ is hardcoded in the module). The larger lever is `create_vpc_endpoints_module`
 > (enabled here), which keeps S3/ECR/STS traffic off the NAT path entirely.
 
-> **No FSx here.** FSx for Lustre is not offered in most Local Zones, and mounting
-> it cross-AZ from a parent AZ is not recommended (latency + cross-zone data
-> transfer). This quickstart leaves FSx out (`create_fsx_module` stays at its
-> upstream default). For shared storage, prefer an in-zone option or stage data
-> separately. The upstream branch does carry an `fsx_availability_zone_id` override
-> for the cross-AZ case if you decide you need it.
+> **No FSx filesystem here.** FSx for Lustre is not offered in most Local Zones,
+> and mounting it cross-AZ from a parent AZ is not recommended (latency +
+> cross-zone data transfer). This quickstart provisions no FSx filesystem —
+> `create_new_fsx_filesystem` stays at its upstream default (`false`), so no
+> filesystem, PV, PVC, or StorageClass is created. (The upstream `create_fsx_module`
+> default of `true` still installs the idle FSx CSI driver + IAM role; that's
+> harmless and left as-is to keep the diff minimal.) For shared storage, prefer
+> an in-zone option or stage data separately. The upstream branch does carry an
+> `fsx_availability_zone_id` override for the cross-AZ case if you decide you need it.
 
 ## Prerequisites
 
@@ -97,6 +100,17 @@ The worker subnet CIDR is associated as its own secondary VPC block.
    aws ec2 modify-availability-zone-group \
      --group-name us-west-2-phx-2a --opt-in-status opted-in
    ```
+   Opt-in is asynchronous — verify it reports `opted-in` before deploying (a
+   not-yet-opted-in zone makes the private subnet fail to create):
+   ```bash
+   aws ec2 describe-availability-zones --all-availability-zones \
+     --filters Name=zone-id,Values=usw2-phx2-az1 \
+     --query "AvailabilityZones[].[ZoneName,ZoneId,OptInStatus]" --output table
+   ```
+   > First time in a zone group you may hit `InvalidAZGroup.NotFound` ("you must
+   > request access"). Some Local Zones require requesting access via the AWS
+   > console (EC2 → Zones, or the Local Zones signup form) before the opt-in call
+   > succeeds.
 4. **FTP (recommended):** a Flexible Training Plan purchased for p5e capacity in
    the target LZ. Set `training_plan_arn` on the instance group in the tfvars.
 5. **Helm repo checkout** — the upstream `helm_chart` module installs from a local
@@ -143,6 +157,16 @@ kubectl describe node <hyperpod-i-...> | grep -E "nvidia.com/gpu|vpc.amazonaws.c
 For EFA/NCCL and DDP smoke tests, the manifests in [`../../eks/manifests/`](../../eks/manifests/)
 apply unchanged (same cluster shape, same pod-spec requirements — see the
 CloudFormation EKS README's "Key pod-spec requirements for EFA on HyperPod EKS").
+
+## Local Zone gotchas
+
+These are the non-obvious ways a Local Zone deploy fails. All were hit during a
+real end-to-end verification in Phoenix (`usw2-phx2-az1`).
+
+| Symptom | Cause & fix |
+|---|---|
+| Instance group fails with **"Failed to process Instance Group Network Configuration details"** (VPC/EKS all succeed; EC2 dry-run shows capacity is fine) | **Not every Local Zone is HyperPod-supported.** This is a HyperPod service-side rejection of the LZ, not a capacity or Terraform issue. There is no API to enumerate supported LZs — confirm with the HyperPod team. In us-west-2, only `usw2-phx2-az1` (Phoenix) is supported; `usw2-lax1-az1` (LA) is not. |
+| `terraform plan` rejects the instance type, or the cluster is created with no eligible type | **The type must clear two gates:** (a) offered in the LZ — `aws ec2 describe-instance-type-offerings --location-type availability-zone-id --filters Name=location,Values=<lz-az-id>`; and (b) in HyperPod's `ClusterInstanceType` enum. e.g. `ml.m5.2xlarge` is in the enum but not offered in Phoenix; `ml.c6i.2xlarge` clears both. |
 
 ## Configuration surface
 
