@@ -138,7 +138,7 @@ class MyDataset(Dataset):
 Scope: ~30 lines changed in the Dataset class. Parsing, tensor construction, training loop, and DDP setup all stay identical.
 
 **Concurrency knobs to tune for training**:
-- `DataLoader(num_workers=32, prefetch_factor=2, persistent_workers=True, pin_memory=True)` was our best measured config on 2 nodes; may need to scale up for larger clusters.
+- `DataLoader(num_workers=..., prefetch_factor=..., persistent_workers=True, pin_memory=True)` — the optimal values depend on hardware and workload. See [`benchmark-observations.md`](./benchmark-observations.md) for observed sweet-spot configurations on our test hardware and how they varied with tuning.
 - `S3MapDataset` handles per-request concurrency internally via CRT.
 
 **Optional: local NVMe caching for multi-epoch training.** If a workload trains multiple epochs over the same data, adding a local NVMe cache layer (write files to `/tmp/cache` as they arrive from S3, read from local disk on subsequent epochs) could boost throughput 2-5× for epochs 2+. We did NOT test this.
@@ -185,16 +185,45 @@ An internal SIM ticket has been filed with the HyperPod team requesting an offic
 - **Multi-node scaling validation**. Our tests ran on 2 nodes. Scaling to 8-64 nodes assumes linear per-node throughput scaling, which is plausible (S3 has vastly more capacity than a small cluster can consume, and each node has an independent ENA), but not directly validated. If a customer commits to a large-cluster deployment based on our numbers, it is worth validating at intermediate (4-8 node) scale first.
 - **Boto3 + explicit CRT config**. `s3torchconnector` already uses CRT and delivers our best measured throughput; testing boto3-with-CRT is expected to match.
 
+## Data preparation
+
+Before running the benchmarks, you need to populate your S3 bucket with the two datasets (or your own data if you want to test different workload shapes). Both source datasets are public.
+
+```bash
+export DEST_BUCKET=<your-bucket>  # e.g. myorg-storage-bench-<account>-<region>
+
+# openalex: LLM-style large sequential shards (~600 GB, 2008 files, ~184 MB each)
+# Source: OpenAlex parquet snapshot on the OpenAlex public S3 bucket
+# Recent partitions from 2025 are a reasonable slice; adjust the date range as
+# needed for your test size.
+aws s3 cp --recursive --no-sign-request \
+  s3://openalex/data/parquet/works/updated_date=2025-01-01/ \
+  s3://${DEST_BUCKET}/openalex/updated_date=2025-01-01/
+# Add more updated_date=... prefixes to grow the dataset to your target size.
+
+# openfold-pdb: protein-structure-style small-file bundles (~644 GB, 524k files)
+# Source: OpenProteinSet on the AWS Open Data registry (Requester Pays bucket)
+aws s3 cp --recursive --request-payer requester \
+  s3://openfold/pdb/ \
+  s3://${DEST_BUCKET}/openfold-pdb/
+```
+
+For FSx-backed tests you also need FSx Data Repository Associations (DRAs) so the same S3 prefixes are visible via the FSx mount. See the AWS docs on [FSx Data Repository Associations](https://docs.aws.amazon.com/fsx/latest/LustreGuide/create-dra.html). Once the DRA is created, files hydrate on first read.
+
+If you want to use different data (recommended, since your workload shape matters more than these specific datasets), point `S3_PREFIX` in the benchmark manifests at your own prefix. The three sample modes (`random_partial`, `whole_file`, `bundle`) let you probe different access patterns without changing the data.
+
 ## How to reproduce
 
-Assuming the infra from [`../README.md`](../README.md) is up (2 p5e nodes in the target LZ):
+Assuming the infra from [`../README.md`](../README.md) is up (2 p5e nodes in the target LZ) and PVCs `fsx-lustre-pvc`, `fsx-lz-pvc`, `s3mp-pvc` are Bound:
+
+**Important**: the `envsubst` calls below use an explicit variable whitelist (e.g. `envsubst '$BACKEND $DATASET ...'`). Do NOT drop the whitelist — the manifests contain `$WORLD_SIZE`, `$RANK`, `$MASTER_ADDR`, `$MASTER_PORT` which must be preserved literally and only expanded by kubelet at pod runtime.
 
 ```bash
 export AWS_PROFILE=<profile> AWS_DEFAULT_REGION=us-west-2
 cd eks/benchmarks
 
 # 1. Sanity-check pod (multi-backend mount check)
-kubectl apply -f manifests/mount-check-3-backends.yaml
+kubectl apply -f ../manifests/mount-check-3-backends.yaml
 kubectl logs -f mount-check-3
 
 # 2. Original T1a/T1b/T1c/T2a benchmarks (single-pod + distributed)
@@ -202,31 +231,54 @@ kubectl logs -f mount-check-3
 ./run-benchmarks.sh t1b          # T1b distributed read
 
 # 3. T2c training-pipeline benchmark on FUSE backends
-kubectl create configmap ddp-bench-t2c-py --from-file=bench_t2c.py=./bench_t2c.py --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap ddp-bench-t2c-py --from-file=bench_t2c.py=./bench_t2c.py \
+  --dry-run=client -o yaml | kubectl apply -f -
 export BACKEND=s3mp-single DATA_PVC=s3mp-pvc DATASET=openalex
 export NUM_WORKERS=4 PREFETCH_FACTOR=2 SAMPLE_MODE=random_partial STEPS=100
 export JOB_SUFFIX=""
 export RUNID=$(date +%Y%m%d-%H%M%S)
-envsubst < manifests/bench-t2c-pytorchjob.yaml | kubectl apply -f -
+envsubst '$BACKEND $DATA_PVC $DATASET $NUM_WORKERS $PREFETCH_FACTOR $SAMPLE_MODE $STEPS $JOB_SUFFIX $RUNID' \
+  < manifests/bench-t2c-pytorchjob.yaml | kubectl apply -f -
 
-# 4. boto3-direct benchmarks
-kubectl create configmap ddp-bench-boto3-py --from-file=bench_boto3.py=./bench_boto3.py --dry-run=client -o yaml | kubectl apply -f -
-# Create ServiceAccount with IRSA
+# 4. boto3-direct benchmark
+# 4a. Create ServiceAccount with IRSA. The IAM role must trust your EKS OIDC
+#     provider and grant s3:GetObject + s3:ListBucket on your bucket.
+#     See s3-direct-access-guide.md for the full trust policy + permissions.
 kubectl create sa boto3-bench-sa
-kubectl annotate sa boto3-bench-sa eks.amazonaws.com/role-arn=arn:aws:iam::<ACCOUNT>:role/<S3-ROLE>
-# Launch
+kubectl annotate sa boto3-bench-sa \
+  eks.amazonaws.com/role-arn=arn:aws:iam::<ACCOUNT>:role/<S3-ROLE>
+
+# 4b. ConfigMap with the bench script
+kubectl create configmap ddp-bench-boto3-py \
+  --from-file=bench_boto3.py=./bench_boto3.py \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 4c. Launch
 export S3_BUCKET=<your-bucket>
 export S3_PREFIX=<your-prefix>/
-export NUM_WORKERS=8 THREADS_PER_WORKER=16 SAMPLE_MODE=bundle
-export DATASET=<dataset-label> JOB_SUFFIX="-bundle-nw8t16"
-envsubst < manifests/bench-boto3-pytorchjob.yaml | kubectl apply -f -
+export DATASET=<dataset-label>
+export NUM_WORKERS=8 THREADS_PER_WORKER=16 PREFETCH_FACTOR=8
+export SAMPLE_MODE=bundle MIN_KEY_SIZE=0 MAX_KEYS=15000 STEPS=100
+export JOB_SUFFIX="-bundle-nw8t16pf8"
+export RUNID=$(date +%Y%m%d-%H%M%S)
+envsubst '$S3_BUCKET $S3_PREFIX $DATASET $NUM_WORKERS $THREADS_PER_WORKER $PREFETCH_FACTOR $SAMPLE_MODE $MIN_KEY_SIZE $MAX_KEYS $STEPS $JOB_SUFFIX $RUNID' \
+  < manifests/bench-boto3-pytorchjob.yaml | kubectl apply -f -
 
-# 5. s3torchconnector benchmark
-kubectl create configmap ddp-bench-s3tc-py --from-file=bench_s3tc.py=./bench_s3tc.py --dry-run=client -o yaml | kubectl apply -f -
-export NUM_WORKERS=32 DATASET=<dataset-label> JOB_SUFFIX="-nw32"
-envsubst < manifests/bench-s3tc-pytorchjob.yaml | kubectl apply -f -
+# 5. s3torchconnector benchmark (reuses boto3-bench-sa)
+kubectl create configmap ddp-bench-s3tc-py \
+  --from-file=bench_s3tc.py=./bench_s3tc.py \
+  --dry-run=client -o yaml | kubectl apply -f -
 
-# 6. Collect result JSONs from FSx to laptop
+export S3_BUCKET=<your-bucket>
+export S3_PREFIX=<your-prefix>/
+export DATASET=<dataset-label>
+export NUM_WORKERS=32 PREFETCH_FACTOR=8 STEPS=100 MAX_KEYS=15000
+export JOB_SUFFIX="-nw32pf8"
+export RUNID=$(date +%Y%m%d-%H%M%S)
+envsubst '$S3_BUCKET $S3_PREFIX $DATASET $NUM_WORKERS $PREFETCH_FACTOR $STEPS $MAX_KEYS $JOB_SUFFIX $RUNID' \
+  < manifests/bench-s3tc-pytorchjob.yaml | kubectl apply -f -
+
+# 6. Collect result JSONs from FSx-LZ to your laptop
 ./run-benchmarks.sh collect
 ```
 
@@ -234,20 +286,23 @@ envsubst < manifests/bench-s3tc-pytorchjob.yaml | kubectl apply -f -
 
 | File | Purpose |
 |---|---|
+| `benchmark.md` | This file — experimental design and methodology |
+| `benchmark-observations.md` | Point observations from one benchmark run (numbers, tuning sweep tables, disclaimers) |
+| `s3-direct-access-guide.md` | Customer-facing guide for reading training data from S3 without FUSE (`s3torchconnector` or `boto3` direct) |
 | `bench.py` | T1a/T1b/T1c/T2a Python driver |
 | `bench_t2c.py` | DDP training-pipeline driver (FUSE-mount based) |
-| `bench_boto3.py` | boto3-direct DDP training-pipeline driver |
+| `bench_boto3.py` | `boto3`-direct DDP training-pipeline driver |
 | `bench_s3tc.py` | `s3torchconnector` DDP training-pipeline driver |
+| `run-benchmarks.sh` | Orchestrator for T1a/T1b/T1c/T2a |
 | `manifests/bench-single-pod-job.yaml` | Job template for T1a/T1c/T2a |
 | `manifests/bench-fsx-lz-job.yaml` | Single-mount workaround for FSx-LZ single-pod tests |
 | `manifests/bench-t1b-pytorchjob.yaml` | PyTorchJob for distributed T1b |
 | `manifests/bench-t1b-fsx-lz-pytorchjob.yaml` | Single-mount variant for FSx-LZ T1b |
-| `manifests/bench-t2c-pytorchjob.yaml` | T2c template (parametrized by NUM_WORKERS, PREFETCH_FACTOR, SAMPLE_MODE) |
+| `manifests/bench-t2c-pytorchjob.yaml` | T2c template (parametrized by `NUM_WORKERS`, `PREFETCH_FACTOR`, `SAMPLE_MODE`) |
 | `manifests/bench-t2c-fsx-lz-pytorchjob.yaml` | T2c FSx-LZ single-mount variant |
-| `manifests/bench-boto3-pytorchjob.yaml` | boto3-direct benchmark PyTorchJob |
+| `manifests/bench-boto3-pytorchjob.yaml` | `boto3`-direct benchmark PyTorchJob |
 | `manifests/bench-s3tc-pytorchjob.yaml` | `s3torchconnector` benchmark PyTorchJob |
-| `manifests/mount-check-3-backends.yaml` | Sanity check pod |
-| `run-benchmarks.sh` | Orchestrator for T1a/T1b/T1c/T2a |
+| `../manifests/mount-check-3-backends.yaml` | Sanity check pod (lives in the parent `eks/manifests/` directory) |
 
 ## Interpretation guide
 
