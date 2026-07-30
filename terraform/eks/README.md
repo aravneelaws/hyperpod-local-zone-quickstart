@@ -16,10 +16,18 @@ it for a Local Zone. You clone the official repo, then run its root module with
 this file:
 
 ```bash
+# Sketch only — see Prerequisites and Deploy below for the full, ordered steps
+# (tool versions, Local Zone opt-in, editing the tfvars for your account).
+
+# Prereq: the helm_chart module installs from a local clone at /tmp/helm-repo.
+git clone https://github.com/aws/sagemaker-hyperpod-cli.git /tmp/helm-repo
+
+# Clone the official reference stack (this branch carries the Local Zone inputs).
 git clone --branch hpeks-localzone-2026-07-29 \
   https://github.com/awslabs/awsome-distributed-ai.git
 cd awsome-distributed-ai/1.architectures/7.sagemaker-hyperpod-eks/terraform-modules/hyperpod-eks-tf
 
+# Edit local-zone.tfvars for your account (LZ AZ IDs, instance groups) first — see Deploy.
 terraform init
 terraform apply -var-file=/path/to/hyperpod-local-zone-quickstart/terraform/eks/local-zone.tfvars
 ```
