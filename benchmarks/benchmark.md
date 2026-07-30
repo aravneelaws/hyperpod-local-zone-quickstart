@@ -2,7 +2,26 @@
 
 Comparing storage backend options for HyperPod training in an AWS Local Zone: FSx Lustre (parent AZ + LZ), S3 Mountpoint (FUSE), boto3-direct, and `s3torchconnector`.
 
-> This document covers the **experimental design and methodology**. For infra setup (VPC, EKS, PVCs, IAM), see the parent [`eks/README.md`](../README.md). For point observations from one specific benchmark run — including tuning sweep tables and observed throughput numbers — see [`benchmark-observations.md`](./benchmark-observations.md). Those observations are not performance commitments; the disclaimer on that file explains how to interpret them.
+> This document covers the **experimental design and methodology**. For point observations from one specific benchmark run — including tuning sweep tables and observed throughput numbers — see [`benchmark-observations.md`](./benchmark-observations.md). Those observations are not performance commitments; the disclaimer on that file explains how to interpret them.
+
+## Prerequisites
+
+This benchmark suite runs against a HyperPod **EKS** cluster in an AWS Local Zone. Deploy one first via any of the paths in this repo:
+
+| Path | IaC | Docs |
+|---|---|---|
+| CloudFormation + shell scripts | CFN | [`../cloudformation/eks/README.md`](../cloudformation/eks/README.md) |
+| Terraform | Terraform | [`../terraform/eks/README.md`](../terraform/eks/README.md) |
+
+After deploying, verify these prerequisites before running the benchmarks:
+
+- HyperPod cluster is `InService` with 2× `ml.p5e.48xlarge` nodes labelled `Schedulable`
+- PVCs `fsx-lustre-pvc` (parent-AZ FSx), `fsx-lz-pvc` (in-LZ FSx), and `s3mp-pvc` (S3 Mountpoint) are all `Bound`
+- The S3 Mountpoint CSI driver is installed and has an IRSA role granting `s3:GetObject` + `s3:ListBucket` on your bench bucket
+- `kubectl` is configured for your EKS cluster and can `exec` into pods
+- Local tools: `aws` CLI, `kubectl`, `envsubst`
+
+The Slurm variant (`../cloudformation/slurm/`) is a different orchestrator and does not support these benchmarks; use one of the EKS paths above.
 
 ## Why this benchmark exists
 
@@ -214,16 +233,16 @@ If you want to use different data (recommended, since your workload shape matter
 
 ## How to reproduce
 
-Assuming the infra from [`../README.md`](../README.md) is up (2 p5e nodes in the target LZ) and PVCs `fsx-lustre-pvc`, `fsx-lz-pvc`, `s3mp-pvc` are Bound:
+Assuming the prerequisites above are met (2 p5e nodes in the target LZ, three PVCs Bound):
 
 **Important**: the `envsubst` calls below use an explicit variable whitelist (e.g. `envsubst '$BACKEND $DATASET ...'`). Do NOT drop the whitelist — the manifests contain `$WORLD_SIZE`, `$RANK`, `$MASTER_ADDR`, `$MASTER_PORT` which must be preserved literally and only expanded by kubelet at pod runtime.
 
 ```bash
 export AWS_PROFILE=<profile> AWS_DEFAULT_REGION=us-west-2
-cd eks/benchmarks
+cd benchmarks
 
 # 1. Sanity-check pod (multi-backend mount check)
-kubectl apply -f ../manifests/mount-check-3-backends.yaml
+kubectl apply -f ../cloudformation/eks/manifests/mount-check-3-backends.yaml
 kubectl logs -f mount-check-3
 
 # 2. Original T1a/T1b/T1c/T2a benchmarks (single-pod + distributed)
@@ -302,7 +321,7 @@ envsubst '$S3_BUCKET $S3_PREFIX $DATASET $NUM_WORKERS $PREFETCH_FACTOR $STEPS $M
 | `manifests/bench-t2c-fsx-lz-pytorchjob.yaml` | T2c FSx-LZ single-mount variant |
 | `manifests/bench-boto3-pytorchjob.yaml` | `boto3`-direct benchmark PyTorchJob |
 | `manifests/bench-s3tc-pytorchjob.yaml` | `s3torchconnector` benchmark PyTorchJob |
-| `../manifests/mount-check-3-backends.yaml` | Sanity check pod (lives in the parent `eks/manifests/` directory) |
+| `../cloudformation/eks/manifests/mount-check-3-backends.yaml` | Sanity check pod (lives with the CFN-EKS manifests) |
 
 ## Interpretation guide
 

@@ -9,7 +9,7 @@
 #   RUNID    - a unique run identifier (auto-generated if empty)
 #
 # The pod's ConfigMap ddp-bench-py holds the Python driver. Ensure it's created:
-#   kubectl create configmap ddp-bench-py --from-file=bench.py=eks/benchmarks/bench.py
+#   kubectl create configmap ddp-bench-py --from-file=bench.py=benchmarks/bench.py
 #
 # Apply pattern (repeat with different envs for each backend x dataset combination):
 #   BACKEND=fsx-lz DATASET=openfold-pdb envsubst < bench-single-pod-job.yaml | kubectl apply -f -

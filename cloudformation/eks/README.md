@@ -2,7 +2,7 @@
 
 Deploys a HyperPod cluster orchestrated by **EKS** in an AWS Local Zone. Validated end-to-end with 2× `ml.p5e.48xlarge` (H200 × 8, 32 EFA interfaces) in Phoenix Local Zone (`us-west-2-phx-2a`) via SageMaker Flexible Training Plans (FTP).
 
-> Looking for the **Slurm variant**? See [`../slurm/`](../slurm/).
+> Looking for the **Slurm variant**? See [`../slurm/`](../slurm/). For the **Terraform** counterpart to this variant, see [`../../terraform/eks/`](../../terraform/eks/).
 
 **Status:** VPC + EKS + helm dependencies + HyperPod cluster + FSx Lustre all deploy successfully. Nodes register as Kubernetes nodes with `Schedulable` health status. 2-node NCCL all-reduce hits **479 GB/s busBw at 16 GB** — matching the Slurm variant to within 1%. End-to-end DDP training with FSx-backed dataset + checkpoints validated including resume-from-checkpoint.
 
@@ -192,14 +192,14 @@ To run the DDP smoke test yourself:
 ## Storage backend benchmarks
 
 Beyond the smoke tests above, this repo includes a **storage backend benchmark
-suite** that compares FSx Lustre (parent AZ + LZ), S3 Mountpoint (FUSE),
+suite** at the top-level [`benchmarks/`](../../benchmarks/) directory. It compares FSx Lustre (parent AZ + LZ), S3 Mountpoint (FUSE),
 `boto3` direct, and `s3torchconnector` across datasets with different access
 patterns (large-shard sequential vs. small-file-per-sample vs.
 bundle-per-sample). See:
 
-- [`benchmarks/benchmark.md`](benchmarks/benchmark.md) — experimental design and methodology
-- [`benchmarks/benchmark-observations.md`](benchmarks/benchmark-observations.md) — point observations from one specific benchmark run (with disclaimers)
-- [`benchmarks/s3-direct-access-guide.md`](benchmarks/s3-direct-access-guide.md) — how to read training data from S3 without FUSE, using `s3torchconnector` or `boto3` direct in your DataLoader
+- [`../../benchmarks/benchmark.md`](../../benchmarks/benchmark.md) — experimental design and methodology
+- [`../../benchmarks/benchmark-observations.md`](../../benchmarks/benchmark-observations.md) — point observations from one specific benchmark run (with disclaimers)
+- [`../../benchmarks/s3-direct-access-guide.md`](../../benchmarks/s3-direct-access-guide.md) — how to read training data from S3 without FUSE, using `s3torchconnector` or `boto3` direct in your DataLoader
 
 ## Key pod-spec requirements for EFA on HyperPod EKS
 
