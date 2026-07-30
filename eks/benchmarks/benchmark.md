@@ -2,7 +2,7 @@
 
 Comparing storage backend options for HyperPod training in an AWS Local Zone: FSx Lustre (parent AZ + LZ), S3 Mountpoint (FUSE), boto3-direct, and `s3torchconnector`.
 
-> This document covers the **experimental design and methodology**. For infra setup (VPC, EKS, PVCs, IAM), see the parent [`eks/README.md`](../README.md). Result data lives outside this repo — see the local `results.md` in your working copy if you have it, or the raw per-run JSONs on FSx-LZ under `/mnt/fsxlz/<backend>/`.
+> This document covers the **experimental design and methodology**. For infra setup (VPC, EKS, PVCs, IAM), see the parent [`eks/README.md`](../README.md). For point observations from one specific benchmark run — including tuning sweep tables and observed throughput numbers — see [`benchmark-observations.md`](./benchmark-observations.md). Those observations are not performance commitments; the disclaimer on that file explains how to interpret them.
 
 ## Why this benchmark exists
 
