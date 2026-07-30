@@ -169,24 +169,24 @@ For deeper prefix hierarchies or complex grouping logic, adapt `_build_bundles()
 
 ### DataLoader tuning knobs
 
-Based on our benchmarks on p5e.48xlarge (2 nodes, 16 GPUs total), the sweet spot for bundle-per-sample workloads is:
+Reasonable starting-point values for a bundle-per-sample workload on p5e-class hardware:
 
 ```python
 DataLoader(
     dataset,
     batch_size=32,
-    num_workers=32,              # 4 workers per rank per GPU
-    prefetch_factor=8,           # 8 batches queued per worker
+    num_workers=32,              # ~2× GPUs on the node
+    prefetch_factor=8,           # batches queued per worker
     persistent_workers=True,
     pin_memory=True,
 )
 ```
 
-- **`num_workers`**: too few and you're CPU-bound in the main process; too many and workers contend for CPU. Sweet spot for us was ~2x the number of GPUs on the node.
-- **`prefetch_factor`**: how many batches each worker queues ahead of the training loop. Higher = more concurrent S3 GETs in flight = higher throughput, up to a point. 8 was our sweet spot; 16 started degrading.
+- **`num_workers`**: too few and you're CPU-bound in the main process; too many and workers contend for CPU and connection pool.
+- **`prefetch_factor`**: how many batches each worker queues ahead of the training loop. Higher = more concurrent S3 GETs in flight = higher throughput, up to a point where contention kicks in.
 - **`persistent_workers=True`**: avoids re-forking workers between epochs. Important because `S3MapDataset` connection state is per-process.
 
-Different workload shapes (larger/smaller batches, larger/smaller files, more/fewer files per sample) may want different values. Tune empirically.
+**Tune empirically for your workload.** Different workload shapes (larger/smaller batches, larger/smaller files, more/fewer files per sample, different hardware) will have different optima. See [`benchmark-observations.md`](./benchmark-observations.md) for the tuning sweep we did to find the values above, and use similar methodology on your setup.
 
 ## Approach 2: `boto3` direct
 
@@ -313,17 +313,7 @@ Two levels of concurrency in this pattern:
 - **`num_workers`** (DataLoader): how many worker PROCESSES fetch data. Each has its own boto3 client and thread pool.
 - **`threads_per_worker`**: how many concurrent S3 GETs each worker can issue simultaneously.
 
-Total in-flight requests per rank = `num_workers * threads_per_worker * prefetch_factor * batch_size`. Our best measured config on 2 p5e nodes was:
-
-```python
-num_workers = 16
-threads_per_worker = 16
-prefetch_factor = 8
-batch_size = 32
-# → 16 * 16 * 8 * 32 = 65,536 concurrent GETs in flight per rank at peak
-```
-
-That's aggressive. Real-world starting point:
+Total in-flight requests per rank = `num_workers * threads_per_worker * prefetch_factor * batch_size`. A reasonable starting point on p5e-class hardware:
 
 ```python
 num_workers = 8
@@ -331,7 +321,16 @@ threads_per_worker = 8
 prefetch_factor = 4
 ```
 
-Then scale up if throughput doesn't saturate the ENA (visible as ~2-3 GB/s per node on p5e), and scale down if you see CPU thrashing or connection pool exhaustion errors.
+For maximum throughput on bundle workloads (with sufficient CPU headroom), push toward:
+
+```python
+num_workers = 16
+threads_per_worker = 16
+prefetch_factor = 8
+batch_size = 32
+```
+
+Scale up if throughput isn't saturating the ENA (monitor per-node network bandwidth), and scale down if you see CPU thrashing or connection pool exhaustion errors. See [`benchmark-observations.md`](./benchmark-observations.md) for tuning sweep results on our specific test setup.
 
 ## IAM setup
 

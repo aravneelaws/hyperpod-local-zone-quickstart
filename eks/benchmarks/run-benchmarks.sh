@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# Runner for the storage-backend benchmark suite.
-# Iterates: 4 backends x 2 datasets x N tests.
+# Runner for the storage-backend benchmark suite (T1a/T1b/T1c/T2a only).
+# For T2c, boto3, and s3torchconnector benchmarks, see the manifests in
+# manifests/ and the "How to reproduce" section in benchmark.md — those are
+# parametric and typically launched one config at a time via envsubst.
 #
 # Usage:
-#   AWS_PROFILE=... ./run-benchmarks.sh                # run all
+#   AWS_PROFILE=... ./run-benchmarks.sh                # run all (T1a+T1b+T1c+T2a)
 #   AWS_PROFILE=... ./run-benchmarks.sh single-pod     # only T1a/T1c/T2a (fast, ~10 min each)
 #   AWS_PROFILE=... ./run-benchmarks.sh t1b            # only T1b (distributed, ~5 min)
 #   AWS_PROFILE=... ./run-benchmarks.sh collect        # download results/ from FSx to laptop
 #
 # Assumes:
 #   - HyperPod cluster is InService with 2 p5e nodes as k8s Schedulable
-#   - All 4 PVCs are Bound: fsx-lustre-pvc, fsx-lz-pvc, s3mp-pvc, s3mp-multinic-pvc
-#   - kubectl is configured for hp-eks-lz-eks
-#   - ConfigMap ddp-bench-py exists (auto-created below)
+#   - PVCs `fsx-lustre-pvc`, `fsx-lz-pvc`, `s3mp-pvc` are Bound
+#   - kubectl is configured for your EKS cluster
+#   - ConfigMap `ddp-bench-py` will be created on first run (auto)
 
 set -euo pipefail
 
