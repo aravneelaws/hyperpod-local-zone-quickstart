@@ -39,6 +39,7 @@ spec:
                 - {name: S3_PREFIX, value: "${S3_PREFIX}"}
                 - {name: RESULTS_ROOT, value: "/results/s3torchconnector"}
                 - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
                 - {name: STEPS, value: "${STEPS}"}
                 - {name: BATCH_SIZE, value: "32"}
                 - {name: MAX_KEYS, value: "${MAX_KEYS}"}
@@ -99,6 +100,7 @@ spec:
                 - {name: S3_PREFIX, value: "${S3_PREFIX}"}
                 - {name: RESULTS_ROOT, value: "/results/s3torchconnector"}
                 - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
                 - {name: STEPS, value: "${STEPS}"}
                 - {name: BATCH_SIZE, value: "32"}
                 - {name: MAX_KEYS, value: "${MAX_KEYS}"}
