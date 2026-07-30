@@ -92,7 +92,7 @@ TRAINING_PLAN_NAME=<your-ftp-name> ./create-hyperpod-cluster.sh
 ./run-ddp-smoke-test.sh apply
 ```
 
-Why 3 stages: the AWS reference CFN uses a Lambda-based helm installer that's currently broken (urllib3 v1 vs Python 3.12 stdlib mismatch — see `.local/context.md` in the parent repo). The AWS workshop's own "Manual HyperPod Cluster Creation" path uses the local `helm` CLI, which is simpler and works reliably.
+Why 3 stages: the AWS reference CFN uses a Lambda-based helm installer that's currently broken (urllib3 v1 vs Python 3.12 stdlib mismatch). The AWS workshop's own "Manual HyperPod Cluster Creation" path uses the local `helm` CLI, which is simpler and works reliably.
 
 ## Prereqs
 
@@ -188,6 +188,18 @@ To run the DDP smoke test yourself:
 ./run-ddp-smoke-test.sh logs     # tail master log
 ./run-ddp-smoke-test.sh reset    # wipe checkpoints, start fresh
 ```
+
+## Storage backend benchmarks
+
+Beyond the smoke tests above, this repo includes a **storage backend benchmark
+suite** that compares FSx Lustre (parent AZ + LZ), S3 Mountpoint (FUSE),
+`boto3` direct, and `s3torchconnector` across datasets with different access
+patterns (large-shard sequential vs. small-file-per-sample vs.
+bundle-per-sample). See:
+
+- [`benchmarks/benchmark.md`](benchmarks/benchmark.md) — experimental design and methodology
+- [`benchmarks/benchmark-observations.md`](benchmarks/benchmark-observations.md) — point observations from one specific benchmark run (with disclaimers)
+- [`benchmarks/s3-direct-access-guide.md`](benchmarks/s3-direct-access-guide.md) — how to read training data from S3 without FUSE, using `s3torchconnector` or `boto3` direct in your DataLoader
 
 ## Key pod-spec requirements for EFA on HyperPod EKS
 

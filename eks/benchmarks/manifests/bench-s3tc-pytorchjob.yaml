@@ -1,0 +1,131 @@
+# T2c-s3torchconnector benchmark. Uses AWS's official PyTorch S3 dataset lib.
+# Env-substituted: DATASET, RUNID, NUM_WORKERS, STEPS, S3_BUCKET, S3_PREFIX, JOB_SUFFIX
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: bench-s3tc-${DATASET}${JOB_SUFFIX}
+  namespace: default
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels: {app: bench-s3tc, dataset: "${DATASET}"}
+        spec:
+          serviceAccountName: boto3-bench-sa
+          nodeSelector:
+            sagemaker.amazonaws.com/compute-type: hyperpod
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: results
+              persistentVolumeClaim: {claimName: fsx-lz-pvc}
+            - name: bench-script
+              configMap: {name: ddp-bench-s3tc-py}
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: "s3torchconnector"}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: S3_BUCKET, value: "${S3_BUCKET}"}
+                - {name: S3_PREFIX, value: "${S3_PREFIX}"}
+                - {name: RESULTS_ROOT, value: "/results/s3torchconnector"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
+                - {name: MAX_KEYS, value: "${MAX_KEYS}"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+                - {name: AWS_DEFAULT_REGION, value: "us-west-2"}
+              volumeMounts:
+                - {name: results, mountPath: /results}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  pip install --quiet boto3 s3torchconnector
+                  mkdir -p /results/s3torchconnector
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench_s3tc.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels: {app: bench-s3tc, dataset: "${DATASET}"}
+        spec:
+          serviceAccountName: boto3-bench-sa
+          nodeSelector:
+            sagemaker.amazonaws.com/compute-type: hyperpod
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: results
+              persistentVolumeClaim: {claimName: fsx-lz-pvc}
+            - name: bench-script
+              configMap: {name: ddp-bench-s3tc-py}
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: "s3torchconnector"}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: S3_BUCKET, value: "${S3_BUCKET}"}
+                - {name: S3_PREFIX, value: "${S3_PREFIX}"}
+                - {name: RESULTS_ROOT, value: "/results/s3torchconnector"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
+                - {name: MAX_KEYS, value: "${MAX_KEYS}"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+                - {name: AWS_DEFAULT_REGION, value: "us-west-2"}
+              volumeMounts:
+                - {name: results, mountPath: /results}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  pip install --quiet boto3 s3torchconnector
+                  mkdir -p /results/s3torchconnector
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench_s3tc.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}

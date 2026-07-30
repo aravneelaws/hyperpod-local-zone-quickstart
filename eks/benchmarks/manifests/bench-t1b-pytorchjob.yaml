@@ -1,0 +1,126 @@
+# Distributed T1b benchmark: 2 nodes x 8 ranks = 16 ranks reading in parallel.
+# Same pod spec approach as our proven NCCL/DDP jobs.
+#
+# Variables substituted at apply time:
+#   BACKEND, DATASET, DATA_PVC, RUNID
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: bench-t1b-${BACKEND}-${DATASET}
+  namespace: default
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata: {labels: {app: bench-t1b, backend: "${BACKEND}", dataset: "${DATASET}"}}
+        spec:
+          nodeSelector:
+            sagemaker.amazonaws.com/instance-group-name: accelerated
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: ${DATA_PVC}
+            - name: results
+              persistentVolumeClaim:
+                claimName: fsx-lz-pvc
+            - name: bench-script
+              configMap:
+                name: ddp-bench-py
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: "${BACKEND}"}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: BENCH, value: "t1b"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: DATA_ROOT, value: "/data"}
+                - {name: RESULTS_ROOT, value: "/results/${BACKEND}"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+              volumeMounts:
+                - {name: data, mountPath: /data}
+                - {name: results, mountPath: /results}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata: {labels: {app: bench-t1b, backend: "${BACKEND}", dataset: "${DATASET}"}}
+        spec:
+          nodeSelector:
+            sagemaker.amazonaws.com/instance-group-name: accelerated
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: ${DATA_PVC}
+            - name: results
+              persistentVolumeClaim:
+                claimName: fsx-lz-pvc
+            - name: bench-script
+              configMap:
+                name: ddp-bench-py
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: "${BACKEND}"}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: BENCH, value: "t1b"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: DATA_ROOT, value: "/data"}
+                - {name: RESULTS_ROOT, value: "/results/${BACKEND}"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+              volumeMounts:
+                - {name: data, mountPath: /data}
+                - {name: results, mountPath: /results}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}

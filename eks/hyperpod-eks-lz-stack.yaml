@@ -51,14 +51,24 @@ Parameters:
     Default: '1.33'
     AllowedValues: ['1.30', '1.31', '1.32', '1.33', '1.34', '1.35']
 
-  # FSx Lustre parameters. FSx isn't available in most Local Zones, so we place
-  # the filesystem in the LZ's parent AZ and cross-zone mount from LZ workers.
-  # A few ms of extra latency; acceptable for shared datasets/checkpoints.
+  # FSx Lustre parameters. FSx Lustre in Local Zones was previously unavailable
+  # (had to place in parent AZ and cross-zone mount). Phoenix LZ now supports
+  # PERSISTENT_2 FSx directly. Set CreateFsxInLZ=true to provision an FSx in
+  # the LZ subnet in addition to the parent-AZ FSx (or instead of it).
   CreateFsx:
     Type: String
     Default: 'true'
     AllowedValues: ['true', 'false']
     Description: Whether to provision an FSx Lustre file system in the parent AZ.
+  CreateFsxInLZ:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Whether to also provision an FSx Lustre file system in the LZ subnet.
+      Requires the LZ to support FSx Lustre (Phoenix LZ does; check
+      https://aws.amazon.com/about-aws/global-infrastructure/localzones/features/
+      for other LZs).
   FsxStorageCapacityGiB:
     Type: Number
     Default: 1200
@@ -68,10 +78,17 @@ Parameters:
     Type: Number
     Default: 250
     AllowedValues: [125, 250, 500, 1000]
-    Description: FSx Lustre throughput per TiB (MB/s per TiB).
+    Description: FSx Lustre throughput per TiB (MB/s per TiB). Note LZ FSx may support fewer tiers than parent-AZ FSx.
+  CreateS3MountpointBucket:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Whether to create an S3 bucket + IAM role for use with the S3 Mountpoint CSI driver.
 
 Conditions:
   ShouldCreateFsx: !Equals [!Ref CreateFsx, 'true']
+  ShouldCreateFsxInLZ: !Equals [!Ref CreateFsxInLZ, 'true']
+  ShouldCreateS3MountpointBucket: !Equals [!Ref CreateS3MountpointBucket, 'true']
 
 Mappings:
   # For us-west-2 the LZ parent is us-west-2b. We put EKS control-plane
@@ -532,6 +549,87 @@ Resources:
         - Key: Name
           Value: !Sub ${ResourceNamePrefix}-fsx
 
+  # ------ Optional: second FSx Lustre in the LZ subnet -------
+  # FSx Lustre in Phoenix LZ supports PERSISTENT_2 with 125 or 250 MB/s per TiB.
+  # Set CreateFsxInLZ=true and this will provision a second file system co-located
+  # with the compute (no cross-zone latency).
+  FsxInLZ:
+    Type: AWS::FSx::FileSystem
+    Condition: ShouldCreateFsxInLZ
+    Properties:
+      FileSystemType: LUSTRE
+      StorageCapacity: !Ref FsxStorageCapacityGiB
+      SubnetIds:
+        - !Ref WorkerSubnet
+      SecurityGroupIds:
+        - !Ref FsxSg
+      LustreConfiguration:
+        DeploymentType: PERSISTENT_2
+        PerUnitStorageThroughput: !Ref FsxPerUnitStorageThroughput
+        DataCompressionType: LZ4
+      Tags:
+        - Key: Name
+          Value: !Sub ${ResourceNamePrefix}-fsx-in-lz
+
+  # ------ Optional: S3 bucket + IAM role for S3 Mountpoint CSI driver -------
+  S3MountpointBucket:
+    Type: AWS::S3::Bucket
+    Condition: ShouldCreateS3MountpointBucket
+    Properties:
+      BucketName: !Sub ${ResourceNamePrefix}-s3mp-${AWS::AccountId}-${AWS::Region}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # IAM role for the S3 Mountpoint CSI driver's ServiceAccount, wired up via
+  # EKS Pod Identity. The role grants access ONLY to the S3 Mountpoint bucket
+  # above; scope to more buckets by editing the Resource ARNs.
+  S3MountpointRole:
+    Type: AWS::IAM::Role
+    Condition: ShouldCreateS3MountpointBucket
+    Properties:
+      RoleName: !Sub ${ResourceNamePrefix}-s3-mountpoint-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: pods.eks.amazonaws.com
+            Action: [sts:AssumeRole, sts:TagSession]
+      Policies:
+        - PolicyName: S3MountpointBucketAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:ListBucket]
+                Resource: !GetAtt S3MountpointBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:AbortMultipartUpload
+                Resource: !Sub ${S3MountpointBucket.Arn}/*
+
+  # Wire the CSI driver's ServiceAccount (s3-csi-driver-sa in kube-system) to
+  # the role above. Requires the S3 Mountpoint CSI Helm chart to be installed
+  # (see install-helm.sh).
+  S3MountpointPodIdentity:
+    Type: AWS::EKS::PodIdentityAssociation
+    Condition: ShouldCreateS3MountpointBucket
+    Properties:
+      ClusterName: !Ref EksCluster
+      Namespace: kube-system
+      ServiceAccount: s3-csi-driver-sa
+      RoleArn: !GetAtt S3MountpointRole.Arn
+
   # ==================== EKS Cluster + Add-ons ====================
   EksCluster:
     Type: AWS::EKS::Cluster
@@ -633,6 +731,33 @@ Outputs:
     Description: FSx Lustre mount name (needed for mount command / PersistentVolume)
     Export:
       Name: !Sub ${AWS::StackName}-FsxMountName
+  FsxInLZFileSystemId:
+    Condition: ShouldCreateFsxInLZ
+    Value: !Ref FsxInLZ
+    Description: FSx Lustre in the LZ subnet (co-located with compute)
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxInLZFileSystemId
+  FsxInLZDnsName:
+    Condition: ShouldCreateFsxInLZ
+    Value: !GetAtt FsxInLZ.DNSName
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxInLZDnsName
+  FsxInLZMountName:
+    Condition: ShouldCreateFsxInLZ
+    Value: !GetAtt FsxInLZ.LustreMountName
+    Export:
+      Name: !Sub ${AWS::StackName}-FsxInLZMountName
+  S3MountpointBucketName:
+    Condition: ShouldCreateS3MountpointBucket
+    Value: !Ref S3MountpointBucket
+    Description: S3 bucket to be mounted by pods via the S3 Mountpoint CSI driver
+    Export:
+      Name: !Sub ${AWS::StackName}-S3MountpointBucketName
+  S3MountpointRoleArn:
+    Condition: ShouldCreateS3MountpointBucket
+    Value: !GetAtt S3MountpointRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-S3MountpointRoleArn
   KubeconfigCommand:
     Value: !Sub aws eks update-kubeconfig --name ${EksCluster} --region ${AWS::Region}
     Description: Run this locally to configure kubectl for this cluster

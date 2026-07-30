@@ -1,0 +1,137 @@
+# T2c training-pipeline benchmark for backend=s3mp-single or fsx-parent.
+# Uses two separate PVCs (data + results). Won't work for fsx-lz backend since
+# that would double-mount the same PVC — use bench-t2c-fsx-lz-pytorchjob.yaml
+# for fsx-lz.
+#
+# Envsubst-substituted: BACKEND, DATA_PVC, DATASET, RUNID, NUM_WORKERS,
+# PREFETCH_FACTOR, SAMPLE_MODE, JOB_SUFFIX
+# JOB_SUFFIX lets you run multiple variants in parallel (e.g. -nw8-pf8-partial).
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: bench-t2c-${BACKEND}-${DATASET}${JOB_SUFFIX}
+  namespace: default
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata: {labels: {app: bench-t2c, backend: "${BACKEND}", dataset: "${DATASET}"}}
+        spec:
+          nodeSelector:
+            sagemaker.amazonaws.com/compute-type: hyperpod
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: ${DATA_PVC}
+            - name: results
+              persistentVolumeClaim:
+                claimName: fsx-lz-pvc
+            - name: bench-script
+              configMap: {name: ddp-bench-t2c-py}
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: "${BACKEND}"}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: DATA_ROOT, value: "/data"}
+                - {name: RESULTS_ROOT, value: "/results/${BACKEND}"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: SAMPLE_MODE, value: "${SAMPLE_MODE}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+              volumeMounts:
+                - {name: data, mountPath: /data}
+                - {name: results, mountPath: /results}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  mkdir -p /results/${BACKEND}
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench_t2c.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata: {labels: {app: bench-t2c, backend: "${BACKEND}", dataset: "${DATASET}"}}
+        spec:
+          nodeSelector:
+            sagemaker.amazonaws.com/compute-type: hyperpod
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: ${DATA_PVC}
+            - name: results
+              persistentVolumeClaim:
+                claimName: fsx-lz-pvc
+            - name: bench-script
+              configMap: {name: ddp-bench-t2c-py}
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: "${BACKEND}"}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: DATA_ROOT, value: "/data"}
+                - {name: RESULTS_ROOT, value: "/results/${BACKEND}"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: SAMPLE_MODE, value: "${SAMPLE_MODE}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+              volumeMounts:
+                - {name: data, mountPath: /data}
+                - {name: results, mountPath: /results}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  mkdir -p /results/${BACKEND}
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench_t2c.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}

@@ -1,0 +1,144 @@
+# T2c-boto3 training-pipeline benchmark: bypasses FUSE, uses boto3 direct
+# S3 range-GETs with configurable per-worker thread concurrency.
+#
+# Env-substituted: DATASET, RUNID, NUM_WORKERS, THREADS_PER_WORKER, STEPS,
+# S3_BUCKET, S3_PREFIX, JOB_SUFFIX
+#
+# Results go to fsx-lz-pvc under /results/boto3/ (same convention as bench_t2c).
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: bench-boto3-${DATASET}${JOB_SUFFIX}
+  namespace: default
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels: {app: bench-boto3, dataset: "${DATASET}"}
+        spec:
+          serviceAccountName: boto3-bench-sa
+          nodeSelector:
+            sagemaker.amazonaws.com/compute-type: hyperpod
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: results
+              persistentVolumeClaim: {claimName: fsx-lz-pvc}
+            - name: bench-script
+              configMap: {name: ddp-bench-boto3-py}
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: "boto3"}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: S3_BUCKET, value: "${S3_BUCKET}"}
+                - {name: S3_PREFIX, value: "${S3_PREFIX}"}
+                - {name: RESULTS_ROOT, value: "/results/boto3"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: THREADS_PER_WORKER, value: "${THREADS_PER_WORKER}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
+                - {name: BYTES_PER_SAMPLE, value: "65536"}
+                - {name: SAMPLE_MODE, value: "${SAMPLE_MODE}"}
+                - {name: MIN_KEY_SIZE, value: "${MIN_KEY_SIZE}"}
+                - {name: MAX_KEYS, value: "${MAX_KEYS}"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+                - {name: AWS_DEFAULT_REGION, value: "us-west-2"}
+              volumeMounts:
+                - {name: results, mountPath: /results}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  pip install --quiet boto3
+                  mkdir -p /results/boto3
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench_boto3.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels: {app: bench-boto3, dataset: "${DATASET}"}
+        spec:
+          serviceAccountName: boto3-bench-sa
+          nodeSelector:
+            sagemaker.amazonaws.com/compute-type: hyperpod
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: results
+              persistentVolumeClaim: {claimName: fsx-lz-pvc}
+            - name: bench-script
+              configMap: {name: ddp-bench-boto3-py}
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: "boto3"}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: S3_BUCKET, value: "${S3_BUCKET}"}
+                - {name: S3_PREFIX, value: "${S3_PREFIX}"}
+                - {name: RESULTS_ROOT, value: "/results/boto3"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: THREADS_PER_WORKER, value: "${THREADS_PER_WORKER}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
+                - {name: BYTES_PER_SAMPLE, value: "65536"}
+                - {name: SAMPLE_MODE, value: "${SAMPLE_MODE}"}
+                - {name: MIN_KEY_SIZE, value: "${MIN_KEY_SIZE}"}
+                - {name: MAX_KEYS, value: "${MAX_KEYS}"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+                - {name: AWS_DEFAULT_REGION, value: "us-west-2"}
+              volumeMounts:
+                - {name: results, mountPath: /results}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  pip install --quiet boto3
+                  mkdir -p /results/boto3
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench_boto3.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}

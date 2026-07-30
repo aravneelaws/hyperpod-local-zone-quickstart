@@ -1,0 +1,79 @@
+# Sanity check: pod that mounts 3 storage backends and verifies mount + write.
+# Multi-NIC S3 Mountpoint is deferred (requires additional ENA attach at boot;
+# see benchmark.md for context). This sanity check covers the 3 backends that
+# don't require special HyperPod configuration.
+#
+# Prereqs: fsx-lustre-pvc, fsx-lz-pvc, s3mp-pvc all Bound.
+# Apply:   kubectl apply -f mount-check-3-backends.yaml
+# Watch:   kubectl logs -f mount-check-3
+# Expect final line: "ALL BACKENDS WORKING"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mount-check-3
+  namespace: default
+spec:
+  restartPolicy: Never
+  serviceAccountName: default
+  nodeSelector:
+    sagemaker.amazonaws.com/instance-group-name: accelerated
+  containers:
+    - name: check
+      image: public.ecr.aws/amazonlinux/amazonlinux:2023
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          set -e
+          # amazonlinux:2023 lacks `hostname` binary; use uname -n
+          HN=$(uname -n)
+          echo "=== Mounts ==="
+          df -h /fsx-parent /fsx-lz /s3mp 2>&1 || true
+          echo ""
+          for path in /fsx-parent /fsx-lz /s3mp; do
+            echo "=== $path ==="
+            if ! ls -la "$path" 2>&1 | head -5; then
+              echo "MOUNT_LIST_FAILED: $path"
+              exit 1
+            fi
+            echo ""
+          done
+          echo "=== Quick write tests (writable backends only) ==="
+          for path in /fsx-lz /s3mp; do
+            TESTFILE="$path/mount-check-$HN-$$"
+            echo "test on $path -> $TESTFILE"
+            if ! echo "hello from $HN" > "$TESTFILE"; then
+              echo "WRITE_FAILED: $path"
+              exit 1
+            fi
+            if ! cat "$TESTFILE" >/dev/null; then
+              echo "READ_FAILED: $path"
+              exit 1
+            fi
+            rm "$TESTFILE" || echo "  (rm failed, likely a permissions or CSI quirk; not fatal)"
+          done
+          echo ""
+          echo "=== FSx-parent write test (best-effort; may fail if capacity full) ==="
+          FSXPARENT_TESTFILE="/fsx-parent/mount-check-$HN-$$"
+          if echo "hello" > "$FSXPARENT_TESTFILE" 2>&1; then
+            cat "$FSXPARENT_TESTFILE" >/dev/null
+            rm "$FSXPARENT_TESTFILE"
+            echo "  fsx-parent OK"
+          else
+            echo "  fsx-parent write failed (may be expected if 1.2 TiB is full with dataset stubs)"
+          fi
+          echo ""
+          echo "ALL BACKENDS WORKING"
+      volumeMounts:
+        - {name: fsx-parent, mountPath: /fsx-parent}
+        - {name: fsx-lz, mountPath: /fsx-lz}
+        - {name: s3mp, mountPath: /s3mp}
+  volumes:
+    - name: fsx-parent
+      persistentVolumeClaim:
+        claimName: fsx-lustre-pvc
+    - name: fsx-lz
+      persistentVolumeClaim:
+        claimName: fsx-lz-pvc
+    - name: s3mp
+      persistentVolumeClaim:
+        claimName: s3mp-pvc

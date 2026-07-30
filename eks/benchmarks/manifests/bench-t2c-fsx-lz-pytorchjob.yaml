@@ -1,0 +1,121 @@
+# T2c training-pipeline benchmark for backend=fsx-lz.
+# Uses single-mount workaround (same as bench-fsx-lz-job.yaml).
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: bench-t2c-fsx-lz-${DATASET}${JOB_SUFFIX}
+  namespace: default
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata: {labels: {app: bench-t2c, backend: fsx-lz, dataset: "${DATASET}"}}
+        spec:
+          nodeSelector:
+            sagemaker.amazonaws.com/compute-type: hyperpod
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: fsxlz
+              persistentVolumeClaim: {claimName: fsx-lz-pvc}
+            - name: bench-script
+              configMap: {name: ddp-bench-t2c-py}
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: fsx-lz}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: DATA_ROOT, value: "/mnt/fsxlz"}
+                - {name: RESULTS_ROOT, value: "/mnt/fsxlz/fsx-lz"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: SAMPLE_MODE, value: "${SAMPLE_MODE}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+              volumeMounts:
+                - {name: fsxlz, mountPath: /mnt/fsxlz}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  mkdir -p /mnt/fsxlz/fsx-lz
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench_t2c.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+    Worker:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata: {labels: {app: bench-t2c, backend: fsx-lz, dataset: "${DATASET}"}}
+        spec:
+          nodeSelector:
+            sagemaker.amazonaws.com/compute-type: hyperpod
+          restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+            - name: fsxlz
+              persistentVolumeClaim: {claimName: fsx-lz-pvc}
+            - name: bench-script
+              configMap: {name: ddp-bench-t2c-py}
+            - name: dshm
+              emptyDir: {medium: Memory, sizeLimit: 32Gi}
+          containers:
+            - name: pytorch
+              image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.6.0-gpu-py312-cu126-ubuntu22.04-ec2-v1.47
+              imagePullPolicy: IfNotPresent
+              env:
+                - {name: BACKEND, value: fsx-lz}
+                - {name: DATASET, value: "${DATASET}"}
+                - {name: RUNID, value: "${RUNID}"}
+                - {name: DATA_ROOT, value: "/mnt/fsxlz"}
+                - {name: RESULTS_ROOT, value: "/mnt/fsxlz/fsx-lz"}
+                - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
+                - {name: SAMPLE_MODE, value: "${SAMPLE_MODE}"}
+                - {name: STEPS, value: "${STEPS}"}
+                - {name: BATCH_SIZE, value: "32"}
+                - {name: FI_PROVIDER, value: efa}
+                - {name: FI_EFA_USE_HUGE_PAGE, value: "0"}
+                - {name: NCCL_DEBUG, value: WARN}
+                - {name: NCCL_SOCKET_IFNAME, value: "^lo,docker,veth,cni,pod-id-link,veth_def"}
+              volumeMounts:
+                - {name: fsxlz, mountPath: /mnt/fsxlz}
+                - {name: bench-script, mountPath: /workspace, readOnly: true}
+                - {name: dshm, mountPath: /dev/shm}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -ex
+                  mkdir -p /mnt/fsxlz/fsx-lz
+                  torchrun \
+                    --nnodes=$WORLD_SIZE \
+                    --node-rank=$RANK \
+                    --nproc-per-node=8 \
+                    --master-addr=$MASTER_ADDR \
+                    --master-port=$MASTER_PORT \
+                    /workspace/bench_t2c.py
+              resources:
+                limits: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
+                requests: {nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32}
