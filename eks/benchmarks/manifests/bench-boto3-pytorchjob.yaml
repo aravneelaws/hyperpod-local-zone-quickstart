@@ -45,6 +45,7 @@ spec:
                 - {name: RESULTS_ROOT, value: "/results/boto3"}
                 - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
                 - {name: THREADS_PER_WORKER, value: "${THREADS_PER_WORKER}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
                 - {name: STEPS, value: "${STEPS}"}
                 - {name: BATCH_SIZE, value: "32"}
                 - {name: BYTES_PER_SAMPLE, value: "65536"}
@@ -109,6 +110,7 @@ spec:
                 - {name: RESULTS_ROOT, value: "/results/boto3"}
                 - {name: NUM_WORKERS, value: "${NUM_WORKERS}"}
                 - {name: THREADS_PER_WORKER, value: "${THREADS_PER_WORKER}"}
+                - {name: PREFETCH_FACTOR, value: "${PREFETCH_FACTOR}"}
                 - {name: STEPS, value: "${STEPS}"}
                 - {name: BATCH_SIZE, value: "32"}
                 - {name: BYTES_PER_SAMPLE, value: "65536"}
