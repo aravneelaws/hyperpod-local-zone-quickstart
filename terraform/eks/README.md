@@ -3,10 +3,10 @@
 Deploys a SageMaker HyperPod cluster orchestrated by **EKS** into an AWS Local
 Zone, using the **official** [`awsome-distributed-ai`](https://github.com/awslabs/awsome-distributed-ai)
 Terraform. This is the Terraform counterpart to the CloudFormation-based
-[`../../eks/`](../../eks/) variant.
+[`../../cloudformation/eks/`](../../cloudformation/eks/) variant.
 
-> Looking for the CloudFormation variants? See [`../../eks/`](../../eks/) (EKS) and
-> [`../../slurm/`](../../slurm/) (Slurm).
+> Looking for the CloudFormation variants? See [`../../cloudformation/eks/`](../../cloudformation/eks/) (EKS) and
+> [`../../cloudformation/slurm/`](../../cloudformation/slurm/) (Slurm).
 
 ## There is no Terraform in this directory — just a tfvars file
 
@@ -162,7 +162,7 @@ kubectl get nodes --show-labels          # hyperpod-i-* nodes, Schedulable
 kubectl describe node <hyperpod-i-...> | grep -E "nvidia.com/gpu|vpc.amazonaws.com/efa"
 ```
 
-For EFA/NCCL and DDP smoke tests, the manifests in [`../../eks/manifests/`](../../eks/manifests/)
+For EFA/NCCL and DDP smoke tests, the manifests in [`../../cloudformation/eks/manifests/`](../../cloudformation/eks/manifests/)
 apply unchanged (same cluster shape, same pod-spec requirements — see the
 CloudFormation EKS README's "Key pod-spec requirements for EFA on HyperPod EKS").
 
@@ -202,4 +202,4 @@ terraform destroy -var-file=/path/to/local-zone.tfvars
 
 If destroy stalls on VPC dependencies (GuardDuty-managed SG, EKS-installed VPC
 endpoints leaving orphan ENIs), see the "Known gotchas" table in
-[`../../eks/README.md`](../../eks/README.md) — the same manual cleanups apply.
+[`../../cloudformation/eks/README.md`](../../cloudformation/eks/README.md) — the same manual cleanups apply.

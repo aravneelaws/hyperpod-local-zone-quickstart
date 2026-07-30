@@ -2,7 +2,7 @@
 
 Deploys a HyperPod (Slurm) cluster in an AWS Local Zone. Tested end-to-end with `p5e.48xlarge` (H200 x 8, 32 EFA interfaces) in Phoenix Local Zone (`us-west-2-phx-2a`) via SageMaker Flexible Training Plans (FTP).
 
-> Looking for the **EKS variant**? See [`../eks/`](../eks/).
+> Looking for the **EKS variant**? See [`../eks/`](../eks/). For the **Terraform** counterpart to the EKS variant, see [`../../terraform/eks/`](../../terraform/eks/).
 
 ## What this validates
 
@@ -200,4 +200,4 @@ aws sagemaker wait cluster-deleted --cluster-name hyperpod-phx-lz-cluster
 
 ## License
 
-MIT-0 — see [LICENSE](../LICENSE).
+MIT-0 — see [LICENSE](../../LICENSE).

@@ -7,10 +7,10 @@
 #
 # Prereqs:
 #   - Cluster deployed (deploy-eks.sh + install-helm.sh + create-fsx-pv.sh + create-hyperpod-cluster.sh)
-#   - ConfigMap created:   kubectl create configmap ddp-train-py --from-file=ddp_train.py=eks/manifests/ddp_train.py
-#   - Dataset seeded:      kubectl apply -f eks/manifests/ddp-dataset-prep-job.yaml
+#   - ConfigMap created:   kubectl create configmap ddp-train-py --from-file=ddp_train.py=cloudformation/eks/manifests/ddp_train.py
+#   - Dataset seeded:      kubectl apply -f cloudformation/eks/manifests/ddp-dataset-prep-job.yaml
 #
-# Apply:  kubectl apply -f eks/manifests/ddp-train-job.yaml
+# Apply:  kubectl apply -f cloudformation/eks/manifests/ddp-train-job.yaml
 # Watch:  kubectl logs -f nccl-ddp-train-master-0
 #
 # Resume test: after the first run completes, delete + re-apply this job.
