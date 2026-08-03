@@ -67,9 +67,9 @@ LZ-local NAT instead of the regional NAT.
 > is at commit `d24a5bb` (LZ private subnet, pending merge into `main`). The
 > three `local_zone_*` egress inputs are the follow-up patch validated in LAX
 > on 2026-08-03 — see [`local-zone.tfvars`](local-zone.tfvars) for use, and
-> [`../../.local/lz-egress-test/FINDINGS.md`](../../.local/lz-egress-test/FINDINGS.md)
-> for the measured A/B evidence. The clone command above checks out the
-> current branch; once fully merged into `main`, drop the `--branch` flag.
+> the LAX A/B numbers in the [Configuration surface](#configuration-surface)
+> section below for the measured evidence. The clone command above checks out
+> the current branch; once fully merged into `main`, drop the `--branch` flag.
 
 ### Architecture
 
