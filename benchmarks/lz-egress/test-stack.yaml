@@ -1,0 +1,445 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Minimal test rig for the LocalZoneEgress feature added to
+  cloudformation/{eks,slurm}/hyperpod-lz-stack.yaml. Isolates ONLY the network
+  topology under test:
+    Config A - LZ private subnet + parent-AZ NAT (baseline)
+    Config B - LZ-local NAT with border-group EIP (LocalZoneEgress=true)
+    Config C - Config B + optional in-LZ FSx Lustre smoke test
+
+  Deploy twice with different LocalZoneEgress values and compare
+  measurements from an EC2 instance placed in the LZ private subnet. See
+  README.md next to this file for methodology and how to run.
+
+  Not for production. Deploy, measure, tear down.
+
+Parameters:
+  ResourceNamePrefix:
+    Type: String
+    Default: hp-lz-egress-test
+    AllowedPattern: '^[a-z][a-z0-9-]{2,30}$'
+  LocalZoneId:
+    Type: String
+    Default: usw2-phx2-az1
+    Description: >
+      AZ ID of the Local Zone to test in. Examples: usw2-phx2-az1 (Phoenix),
+      usw2-lax1-az1 (LA). Look up available LZs in your account with:
+        aws ec2 describe-availability-zones --all-availability-zones \
+          --query "AvailabilityZones[?ZoneType=='local-zone'].[ZoneName,ZoneId,ParentZoneName,OptInStatus]"
+  LocalZoneName:
+    Type: String
+    Default: us-west-2-phx-2a
+    Description: >
+      Zone NAME of the Local Zone (matches LocalZoneId). Currently informational
+      here; kept as a parameter so it stays visible alongside NetworkBorderGroup.
+  NetworkBorderGroup:
+    Type: String
+    Default: us-west-2-phx-2
+    Description: >
+      NetworkBorderGroup for the LZ EIP. REQUIRED when LocalZoneEgress=true -
+      a plain vpc-scoped EIP cannot attach to a NAT gateway in an LZ subnet.
+      The border group is the zone name minus the trailing zone letter, e.g.
+      us-west-2-phx-2a -> us-west-2-phx-2, us-west-2-lax-1a -> us-west-2-lax-1.
+  ParentAz:
+    Type: String
+    Default: us-west-2b
+    Description: >
+      Parent AZ of the LZ (from ParentZoneName in describe-availability-zones).
+      For Phoenix and LAX usw2-*-az1, the parent is us-west-2b.
+  LocalZoneEgress:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      false = LZ private subnet egresses through parent-AZ NAT (baseline).
+      true  = LZ private subnet egresses through LZ-local NAT with
+              border-group EIP (the feature under test).
+
+  VpcCidr:
+    Type: String
+    Default: 10.55.0.0/16
+  ParentPublicSubnetCidr:
+    Type: String
+    Default: 10.55.0.0/24
+    Description: Public subnet in the parent AZ (hosts the parent-AZ NAT + IGW route)
+  LzPublicSubnetCidr:
+    Type: String
+    Default: 10.55.1.0/24
+    Description: Public subnet in the LZ (only used when LocalZoneEgress=true; hosts LZ NAT)
+  LzPrivateSubnetCidr:
+    Type: String
+    Default: 10.55.2.0/24
+    Description: Private subnet in the LZ (hosts the test EC2 instance)
+
+  CreateFsxInLz:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Optional smoke test - provisions an FSx Lustre filesystem in the LZ
+      private subnet. Only useful when LocalZoneEgress=true is also set
+      (Config C). PERSISTENT_2 is not offered in every LZ (see FsxDeploymentType).
+  FsxCapacityGiB:
+    Type: Number
+    Default: 1200
+    MinValue: 1200
+  FsxThroughputPerTiB:
+    Type: Number
+    Default: 125
+    AllowedValues: [50, 100, 125, 200, 250, 500, 1000]
+    Description: >
+      Per-TiB throughput. PERSISTENT_1 allows 50/100/200. PERSISTENT_2 allows
+      125/250/500/1000. Phoenix supports PERSISTENT_2; other LZs may only
+      support PERSISTENT_1. 50 keeps the test cheap and portable.
+  FsxDeploymentType:
+    Type: String
+    Default: PERSISTENT_1
+    AllowedValues: [PERSISTENT_1, PERSISTENT_2, SCRATCH_2]
+    Description: >
+      PERSISTENT_2 is not offered in every LZ. PERSISTENT_1 is broadly
+      available but the LZ's Lustre server version may be too old for
+      modern clients (see README). SCRATCH_2 is cheapest but non-durable.
+
+  InstanceType:
+    Type: String
+    Default: c5.large
+    AllowedValues: [c5.large, c5.xlarge, m5.large, t3.large]
+    Description: CPU instance for the test. c5.large is a safe default.
+  Ec2AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64
+    Description: AL2023 AMI (has SSM agent preinstalled)
+
+Conditions:
+  UseLzEgress: !Equals [!Ref LocalZoneEgress, 'true']
+  CreateFsx:   !Equals [!Ref CreateFsxInLz,   'true']
+
+Resources:
+
+  # ==================== VPC + IGW ====================
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-vpc'}
+        - {Key: Project, Value: hp-lz-egress-test}
+
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-igw'}
+        - {Key: Project, Value: hp-lz-egress-test}
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref Igw
+
+  # ==================== Subnets ====================
+  # Parent-AZ public subnet: always present. Hosts the parent-AZ NAT gateway
+  # (used by Config A). Matches the default topology in the main
+  # HyperPod LZ CFN templates when LocalZoneEgress=false.
+  ParentPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref ParentPublicSubnetCidr
+      AvailabilityZone: !Ref ParentAz
+      MapPublicIpOnLaunch: true
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-parent-public'}
+        - {Key: Project, Value: hp-lz-egress-test}
+
+  # LZ private subnet: hosts the test instance. Uses AvailabilityZoneId
+  # (not zone name), since LZs are addressed by ID.
+  LzPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref LzPrivateSubnetCidr
+      AvailabilityZoneId: !Ref LocalZoneId
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-lz-private'}
+        - {Key: Project, Value: hp-lz-egress-test}
+
+  # LZ public subnet: only created when LocalZoneEgress=true. Hosts the LZ NAT.
+  LzPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Condition: UseLzEgress
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref LzPublicSubnetCidr
+      AvailabilityZoneId: !Ref LocalZoneId
+      MapPublicIpOnLaunch: true
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-lz-public'}
+        - {Key: Project, Value: hp-lz-egress-test}
+
+  # ==================== NAT Gateways ====================
+  # Parent-AZ NAT: always created (Config A baseline).
+  # In Config B we still create it but the LZ private subnet's default route
+  # points at the LZ NAT instead.
+  ParentNatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: IgwAttach
+    Properties:
+      Domain: vpc
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-parent-nat-eip'}
+        - {Key: Project, Value: hp-lz-egress-test}
+  ParentNat:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt ParentNatEip.AllocationId
+      SubnetId: !Ref ParentPublicSubnet
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-parent-nat'}
+        - {Key: Project, Value: hp-lz-egress-test}
+
+  # LZ NAT: only when LocalZoneEgress=true.
+  # NetworkBorderGroup on the EIP is REQUIRED. Without it, allocate
+  # returns a region-scoped EIP that CANNOT attach to an LZ NAT gateway
+  # ("EIP is not associated with the border group of the subnet").
+  LzNatEip:
+    Type: AWS::EC2::EIP
+    Condition: UseLzEgress
+    DependsOn: IgwAttach
+    Properties:
+      Domain: vpc
+      NetworkBorderGroup: !Ref NetworkBorderGroup
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-lz-nat-eip'}
+        - {Key: Project, Value: hp-lz-egress-test}
+  LzNat:
+    Type: AWS::EC2::NatGateway
+    Condition: UseLzEgress
+    Properties:
+      AllocationId: !GetAtt LzNatEip.AllocationId
+      SubnetId: !Ref LzPublicSubnet
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-lz-nat'}
+        - {Key: Project, Value: hp-lz-egress-test}
+
+  # ==================== Route Tables ====================
+  ParentPublicRt:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-parent-public-rt'}
+  ParentPublicDefault:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttach
+    Properties:
+      RouteTableId: !Ref ParentPublicRt
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+  ParentPublicAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref ParentPublicSubnet
+      RouteTableId: !Ref ParentPublicRt
+
+  # LZ public RT (Config B only): to IGW.
+  LzPublicRt:
+    Type: AWS::EC2::RouteTable
+    Condition: UseLzEgress
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-lz-public-rt'}
+  LzPublicDefault:
+    Type: AWS::EC2::Route
+    Condition: UseLzEgress
+    DependsOn: IgwAttach
+    Properties:
+      RouteTableId: !Ref LzPublicRt
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+  LzPublicAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: UseLzEgress
+    Properties:
+      SubnetId: !Ref LzPublicSubnet
+      RouteTableId: !Ref LzPublicRt
+
+  # LZ private RT: default route selects NAT based on LocalZoneEgress.
+  LzPrivateRt:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-lz-private-rt'}
+  LzPrivateDefault:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref LzPrivateRt
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !If [UseLzEgress, !Ref LzNat, !Ref ParentNat]
+  LzPrivateAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref LzPrivateSubnet
+      RouteTableId: !Ref LzPrivateRt
+
+  # S3 gateway endpoint on the LZ private RT so S3 traffic does not
+  # hairpin through NAT (matches the main HyperPod templates).
+  S3GwEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref LzPrivateRt
+
+  # ==================== Instance + SSM ====================
+  Ec2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref Ec2Role]
+
+  InstanceSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: LZ egress test instance SG - egress only
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-instance-sg'}
+
+  # Instance in the LZ private subnet. Reaches SSM via NAT (parent or LZ per config).
+  TestInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref Ec2AmiId
+      IamInstanceProfile: !Ref Ec2InstanceProfile
+      SubnetId: !Ref LzPrivateSubnet
+      SecurityGroupIds: [!Ref InstanceSg]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            DeleteOnTermination: true
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-test-instance'}
+        - {Key: Project, Value: hp-lz-egress-test}
+        - {Key: Config, Value: !If [UseLzEgress, 'B-lz-egress', 'A-parent-egress']}
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          set -eux
+          # Best-effort install of tools used by measure.sh. traceroute and
+          # bind-utils are the important ones; lustre-client is only needed
+          # if you set CreateFsxInLz=true.
+          dnf install -y traceroute bind-utils nfs-utils lustre-client 2>/dev/null || true
+          dnf install -y traceroute bind-utils nfs-utils || true
+
+  # ==================== Optional: FSx Lustre in the LZ ====================
+  FsxSg:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateFsx
+    Properties:
+      GroupDescription: FSx Lustre in LZ - ports 988 and 1018-1023
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-fsx-sg'}
+  FsxSgIngressFromInstance988:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: CreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      SourceSecurityGroupId: !Ref InstanceSg
+  FsxSgIngressFromInstanceData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: CreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      SourceSecurityGroupId: !Ref InstanceSg
+  FsxSgIngressSelf988:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: CreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 988
+      ToPort: 988
+      SourceSecurityGroupId: !Ref FsxSg
+  FsxSgIngressSelfData:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: CreateFsx
+    Properties:
+      GroupId: !Ref FsxSg
+      IpProtocol: tcp
+      FromPort: 1018
+      ToPort: 1023
+      SourceSecurityGroupId: !Ref FsxSg
+
+  FsxInLz:
+    Type: AWS::FSx::FileSystem
+    Condition: CreateFsx
+    DeletionPolicy: Delete
+    Properties:
+      FileSystemType: LUSTRE
+      StorageCapacity: !Ref FsxCapacityGiB
+      SubnetIds: [!Ref LzPrivateSubnet]
+      SecurityGroupIds: [!Ref FsxSg]
+      LustreConfiguration:
+        DeploymentType: !Ref FsxDeploymentType
+        PerUnitStorageThroughput: !Ref FsxThroughputPerTiB
+        DataCompressionType: LZ4
+      Tags:
+        - {Key: Name, Value: !Sub '${ResourceNamePrefix}-fsx-in-lz'}
+        - {Key: Project, Value: hp-lz-egress-test}
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+  Config:
+    Value: !If [UseLzEgress, 'B-lz-egress', 'A-parent-egress']
+  InstanceId:
+    Value: !Ref TestInstance
+  LzPrivateSubnetId:
+    Value: !Ref LzPrivateSubnet
+  ParentNatId:
+    Value: !Ref ParentNat
+  LzNatId:
+    Condition: UseLzEgress
+    Value: !Ref LzNat
+  LzNatEipAddress:
+    Condition: UseLzEgress
+    Value: !Ref LzNatEip
+  ParentNatEipAddress:
+    Value: !Ref ParentNatEip
+  FsxDnsName:
+    Condition: CreateFsx
+    Value: !GetAtt FsxInLz.DNSName
+  FsxMountName:
+    Condition: CreateFsx
+    Value: !GetAtt FsxInLz.LustreMountName

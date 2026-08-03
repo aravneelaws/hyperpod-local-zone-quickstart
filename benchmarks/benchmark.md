@@ -3,6 +3,8 @@
 Comparing storage backend options for HyperPod training in an AWS Local Zone: FSx Lustre (parent AZ + LZ), S3 Mountpoint (FUSE), boto3-direct, and `s3torchconnector`.
 
 > This document covers the **experimental design and methodology**. For point observations from one specific benchmark run — including tuning sweep tables and observed throughput numbers — see [`benchmark-observations.md`](./benchmark-observations.md). Those observations are not performance commitments; the disclaimer on that file explains how to interpret them.
+>
+> For a **separate**, network-only A/B rig that validates the `LocalZoneEgress` feature on the LZ CFN templates without deploying HyperPod or EKS, see [`lz-egress/README.md`](./lz-egress/README.md). Different scope, different lifecycle, complementary to the storage-backend suite here.
 
 ## Prerequisites
 
