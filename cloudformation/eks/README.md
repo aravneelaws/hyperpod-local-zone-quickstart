@@ -8,65 +8,42 @@ Deploys a HyperPod cluster orchestrated by **EKS** in an AWS Local Zone. Validat
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph vpc["VPC 10.44.0.0/16 + 10.45.0.0/16 (us-west-2)"]
-        direction TB
+Two supported topologies. The default (`LocalZoneEgress=false`) matches the customer-inherited layout and is functionally correct but pays a per-packet cross-region hop for internet egress. `LocalZoneEgress=true` adds an LZ-local NAT so LZ workers egress directly.
 
-        subgraph az1["Parent AZ us-west-2a"]
-            nat["NAT Gateway"]
-            eks1["EKS Control Plane ENI"]
-        end
-
-        subgraph az2["Parent AZ us-west-2b (LZ parent)"]
-            eks2["EKS Control Plane ENI"]
-            fsx[("FSx Lustre<br/>PERSISTENT_2, 1.2 TiB")]
-        end
-
-        subgraph lz["Local Zone us-west-2-phx-2a"]
-            w1["Worker 1<br/>ml.p5e.48xlarge<br/>(FTP-reserved)<br/>hyperpod-i-*"]
-            w2["Worker 2<br/>ml.p5e.48xlarge<br/>(FTP-reserved)<br/>hyperpod-i-*"]
-        end
-    end
-
-    eksapi>"EKS API<br/>(managed by AWS)"]
-    igw((IGW))
-
-    igw --- nat
-    eks1 --- eksapi
-    eks2 --- eksapi
-
-    w1 <-.->|"kubelet<br/>(control, cross-zone)"| eksapi
-    w2 <-.->|"kubelet<br/>(control, cross-zone)"| eksapi
-
-    w1 <==>|"NCCL over EFA<br/>32 rails, intra-LZ"| w2
-
-    w1 -->|FSx CSI mount<br/>cross-zone| fsx
-    w2 -->|FSx CSI mount<br/>cross-zone| fsx
-
-    nat -->|egress| lz
-
-    classDef zone fill:#f9f9f9,stroke:#999,stroke-width:1px
-    classDef ext fill:#eef7ff,stroke:#3388cc,stroke-width:1px
-    class az1,az2,lz zone
-    class eksapi ext
-```
-
-**Text summary:**
+**Default topology (`LocalZoneEgress=false`, shipped default):**
 
 ```
 VPC (10.44.0.0/16 primary + 10.45.0.0/16 secondary, us-west-2)
-├── us-west-2a (parent AZ 1)
-│   ├── public subnet     → NAT
-│   └── /28 subnet        → EKS control plane ENI
-├── us-west-2b (parent AZ 2 = LZ's parent)
-│   ├── public subnet     → FSx Lustre file system (cross-zone mounted from LZ)
-│   └── /28 subnet        → EKS control plane ENI (HA)
+├── us-west-2b (LZ parent AZ)
+│   ├── public subnet     → NAT   (LZ workers egress via this NAT, ~24-35 ms hairpin)
+│   └── /28 subnet        → EKS control-plane ENI
+├── us-west-2a (other parent AZ)
+│   ├── public subnet     → FSx Lustre (when FsxLocation=parent, default)
+│   └── /28 subnet        → EKS control-plane ENI (HA)
 └── us-west-2-phx-2a (Local Zone, secondary CIDR 10.45.0.0/24)
-    └── worker subnet     → HyperPod accelerated instance group (ml.p5e.48xlarge x 2)
+    └── worker subnet     → HyperPod accelerated instance group (its own route table)
+```
+
+**LZ-egress topology (`LocalZoneEgress=true`, recommended):**
+
+```
+VPC (10.44.0.0/16 primary + 10.45.0.0/16 secondary, us-west-2)
+├── us-west-2b (LZ parent AZ)
+│   ├── public subnet     → parent NAT   (used only by EKS control-plane subnets)
+│   └── /28 subnet        → EKS control-plane ENI
+├── us-west-2a (other parent AZ)
+│   └── /28 subnet        → EKS control-plane ENI (HA)
+└── us-west-2-phx-2a (Local Zone)
+    ├── LZ public subnet  → LZ NAT with border-group EIP
+    ├── worker subnet     → HyperPod workers (0.0.0.0/0 → LZ NAT, first hop ~0.1 ms)
+    └── FSx Lustre        → when FsxLocation=lz (in-LZ, co-located, no cross-zone hop)
 ```
 
 Key insight: **EKS control plane cannot create ENIs in a Local Zone**, so the control plane subnets must be in parent AZs. HyperPod's `AWS::SageMaker::Cluster.VpcConfig.Subnets` places workers in the LZ subnet. Workers join the EKS cluster via HyperPod-managed ENIs.
+
+### The parent-AZ bug that shipped
+
+Prior to 2026-08, this template's `RegionAzs` mapping put the parent NAT in `us-west-2a` while Phoenix LZ's actual parent is `us-west-2b`. That silently added one inter-AZ hop to every LZ egress packet on top of the LZ→region hairpin. Fixed in the same change that introduced `LocalZoneEgress`. If you are upgrading an existing stack: the parent-NAT subnet now moves AZs, which forces subnet replacement — plan a maintenance window or deploy a new stack.
 
 ## Deploy workflow
 
@@ -94,6 +71,100 @@ TRAINING_PLAN_NAME=<your-ftp-name> ./create-hyperpod-cluster.sh
 
 Why 3 stages: the AWS reference CFN uses a Lambda-based helm installer that's currently broken (urllib3 v1 vs Python 3.12 stdlib mismatch). The AWS workshop's own "Manual HyperPod Cluster Creation" path uses the local `helm` CLI, which is simpler and works reliably.
 
+## Local Zone egress (`LocalZoneEgress`)
+
+By default, LZ workers reach the internet through a NAT gateway in the LZ's parent AZ. Every packet hairpins across the region link before touching the public internet. Measured in LAX (2026-08-03, c5.large in `usw2-lax1-az1`): traceroute hop 1 = 23.8 ms, Cloudflare 25 MB download 44 MB/s, PyPI index fetch 797 ms. This is what the customer sees.
+
+`LocalZoneEgress=true` adds an LZ-local NAT gateway with a `NetworkBorderGroup`-scoped EIP, splits the worker subnet onto its own route table, and points `0.0.0.0/0` at the LZ NAT. Same LAX rig (side-by-side A/B, single-variable change):
+
+| Metric | Off (default) | On | Improvement |
+|---|---:|---:|---:|
+| Traceroute hop 1 | 23.8 ms | **0.095 ms** | 250× |
+| PyPI TTFB | 111 ms | **17 ms** | 6.5× |
+| PyPI throughput | 56 MB/s | **311 MB/s** | 5.6× |
+| Cloudflare 25 MB total | 565 ms | **132 ms** | 4.3× |
+| Ubuntu InRelease total | 1,535 ms | **567 ms** | 2.7× |
+
+Enable it by setting three parameters:
+
+```bash
+aws cloudformation deploy \
+  --template-file cloudformation/eks/hyperpod-eks-lz-stack.yaml \
+  --stack-name hp-eks-lz \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    LocalZoneEgress=true \
+    LocalZoneId=usw2-phx2-az1 \
+    LocalZoneName=us-west-2-phx-2a \
+    NetworkBorderGroup=us-west-2-phx-2 \
+    LzPublicSubnetCidr=10.45.1.0/24     # optional; default matches this
+```
+
+**Why three parameters and not one:** the EIP for an LZ NAT must be allocated in the LZ's `NetworkBorderGroup` (a plain vpc-scoped EIP will not attach). The border-group name is the zone name minus the trailing letter (`us-west-2-phx-2a` → `us-west-2-phx-2`), but CFN string functions cannot reliably suffix-strip on multi-letter zone names (`us-west-2-lax-1a` would break a naive `!Split ['a', ...]`), so `NetworkBorderGroup` is passed explicitly.
+
+**What LZ egress does not fix.** The customer's investigation identified five latency-related symptoms; egress addresses one:
+
+| Symptom | Fixed by `LocalZoneEgress=true`? |
+|---|---|
+| Public HTTPS TTFB, `pip`/`apt`/`git` slow, low download throughput | Yes, 3-6× |
+| DNS (140 ms → sub-ms via `ndots:2` + LZ-local CoreDNS) | No, needs pod-spec changes |
+| FSx / OpenZFS (~35 ms per syscall from LZ) | No, needs `FsxLocation=lz` (below) |
+| EKS API 35 ms | No, managed control plane cannot live in an LZ |
+| Origin-anchored public services (GitHub, HuggingFace) | ~5% improvement, dominated by CDN routing |
+
+## FSx location (`FsxLocation`)
+
+The template supports three placements:
+
+| `FsxLocation` | Where | When to use |
+|---|---|---|
+| `parent` (default) | `us-west-2a` public subnet | LZs that do not offer FSx Lustre, or offer only tiers your workload can't use |
+| `lz` | LZ worker subnet | Recommended. FSx co-located with compute. No cross-zone latency. Requires the target LZ to support your `FsxPerUnitStorageThroughput` tier. |
+| `none` | No filesystem provisioned | Bring your own, or run without shared storage |
+
+**Per-LZ FSx portability.** Not every LZ offers PERSISTENT_2 or a modern Lustre server version. Verified per-LZ status:
+
+| LZ | PERSISTENT_2 offered? | Notes |
+|---|---|---|
+| Phoenix (`usw2-phx2-az1`) | **Yes** | Validated with 1.2 TiB @ 250 MB/s per TiB. Our earlier benchmarks show 21× DDP read speedup vs cross-zone parent-AZ FSx. |
+| LAX (`usw2-lax1-az1`) | **No** | CFN rejects with `"The requested Lustre configuration: PERSISTENT_2 is not available in this availability zone."` PERSISTENT_1 is offered but runs Lustre server 2.10.5, incompatible with the AL2023-bundled 2.15.6 client (verified 2026-08-03). |
+
+If deploying to a non-Phoenix LZ with `FsxLocation=lz`, verify PERSISTENT_2 offering first:
+
+```bash
+aws fsx describe-file-systems --region us-west-2 --query "Length: FileSystems | length(@)" 2>/dev/null
+# The DescribeFileSystems API doesn't enumerate supported tiers per zone.
+# Fastest way to check: try to create a small filesystem and check the error.
+```
+
+**Legacy inputs (`CreateFsx`, `CreateFsxInLZ`).** Still honored for backward compatibility when `FsxLocation=parent` (default). Deploying with the shipped defaults today reproduces the old behavior exactly: one parent-AZ FSx, no LZ FSx.
+
+## Deploy workflow (LZ-egress + in-LZ FSx, recommended)
+
+The "recommended" deploy for a HyperPod-supported LZ like Phoenix:
+
+```bash
+export AWS_PROFILE=<your-profile>
+export AWS_DEFAULT_REGION=us-west-2
+
+# Deploy with LZ egress + FSx co-located in the LZ
+aws cloudformation deploy \
+  --template-file cloudformation/eks/hyperpod-eks-lz-stack.yaml \
+  --stack-name hp-eks-lz \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    LocalZoneEgress=true \
+    LocalZoneId=usw2-phx2-az1 \
+    LocalZoneName=us-west-2-phx-2a \
+    NetworkBorderGroup=us-west-2-phx-2 \
+    FsxLocation=lz
+
+# Continue with the standard stages 2-4
+./install-helm.sh
+./create-fsx-pv.sh
+TRAINING_PLAN_NAME=<your-ftp-name> ./create-hyperpod-cluster.sh
+```
+
 ## Prereqs
 
 - `AWS_PROFILE` with SageMaker + EKS + CFN + IAM + EC2 permissions
@@ -118,13 +189,16 @@ Why 3 stages: the AWS reference CFN uses a Lambda-based helm installer that's cu
 
 ## FSx Lustre configuration
 
-- **Location:** parent AZ (`us-west-2b` for PHX LZ). FSx is not available in most LZs.
-- **Access from LZ workers:** cross-zone mount over the VPC. In-cluster mount address is `<parent-AZ-IP>@tcp:/<mount-name>` — HyperPod workers in the LZ subnet reach it directly.
+- **Location:** controlled by `FsxLocation` (see [FSx location](#fsx-location-fsxlocation) above). Default `parent` (cross-zone mount, ~1-5 ms per syscall overhead). Recommended `lz` when the target LZ supports it — no cross-zone latency.
 - **Access mode:** `ReadWriteMany`. Multiple pods across multiple nodes can mount concurrently.
 - **Provisioning:** static (we pre-create the file system in CFN and expose it as a fixed PV). Dynamic provisioning (creating a new FSx per PVC) is also supported by the CSI driver but not the common pattern for shared-training-datasets.
-- **Sample measurements** from the LZ (single-stream I/O on 1 GiB file):
+- **Sample measurements** from the LZ (single-stream I/O on 1 GiB file, cross-zone mount from `FsxLocation=parent`):
   - Write: ~83 MB/s (limited by single-stream fdatasync, cross-zone latency)
   - Read: ~595 MB/s (exceeds nominal 300 MB/s throughput thanks to client-side caching)
+- **In-LZ vs parent-AZ FSx measurements** (from `benchmarks/results/`, 2-node DDP over Phoenix LZ):
+  - Parent-AZ FSx (cross-zone): 33 MB/s aggregate → 498 samples/sec
+  - In-LZ FSx (same-zone): 700 MB/s aggregate → 10,689 samples/sec (**21×**)
+  - Metadata delta on rglob 524k files: 70 files/sec vs 16,016 files/sec (**229×**)
 - **Recommendation:** put training data (streamed reads) on FSx; parallel access across ranks scales far higher than the single-stream numbers. Put per-node venv/software on `/opt/dlami/nvme/` (local NVMe), not FSx — pip install on FSx is dominated by small-file metadata operations.
 - `results/nccl-2node-eks-tcp.log` — Sample PyTorchJob output on 2 nodes × 8 GPUs. `~3.2 GB/s busBw` (TCP fallback, no aws-ofi-nccl in container).
 
@@ -218,10 +292,14 @@ See `results/nccl-efa-job.yaml` for the full working spec.
 | Gotcha | Fix |
 |---|---|
 | EKS control plane can't be created in a Local Zone | Put EKS control-plane subnets in parent AZs; put HyperPod worker subnet in the LZ; do NOT include the LZ subnet in `AWS::EKS::Cluster.ResourcesVpcConfig.SubnetIds` |
+| `LocalZoneEgress=true` fails at stack create with `"EIP is not associated with the border group..."` | The `NetworkBorderGroup` parameter must match the LZ. It's the `LocalZoneName` minus the trailing zone letter: `us-west-2-phx-2a` → `us-west-2-phx-2`. Not derived automatically because CFN string ops don't reliably suffix-strip. |
+| `FsxLocation=lz` fails with `"The requested Lustre configuration: PERSISTENT_2 is not available in this availability zone"` | The target LZ does not offer PERSISTENT_2. Verified in Phoenix (works); verified broken in LAX. Fall back to `FsxLocation=parent` in that LZ, or use a different LZ. |
+| FSx-in-LZ mount fails from AL2023 client with `"Server MGS version (2.10.5.0) refused connection from this client with an incompatible version (2.15.6)"` | The LZ's PERSISTENT_1 offering runs an old Lustre server incompatible with modern clients. Verified in LAX 2026-08-03. No client-side workaround; use a different LZ or `FsxLocation=parent`. |
 | Reference CFN's `AvailabilityZoneId` regex rejects LZ zone IDs like `usw2-phx2-az1` | Relaxed regex: `^[a-z]{3,4}[0-9](-[a-z0-9]+)?-az[0-9]$` |
 | Workshop Studio helm-install Lambda fails with urllib3 import error | Skip the Lambda entirely; use the AWS workshop's "Manual HyperPod Cluster Creation" path with local `helm` CLI |
 | First helm install may hit `http2: client connection lost` mid-CRD-install | Rerun with `helm uninstall`+`kubectl delete secret sh.helm.release.v1.hyperpod-dependencies.v1`+`helm install` |
 | GuardDuty auto-creates a security group in the VPC that CFN can't delete | Manually `aws ec2 delete-security-group --group-id <GuardDutyManagedSecurityGroup-*>` before stack delete |
+| GuardDuty auto-injects a VPC endpoint (`com.amazonaws.<region>.guardduty-data`) whose ENI blocks subnet deletion | Manually `aws ec2 delete-vpc-endpoints --vpc-endpoint-ids <vpce-...>`, wait ~60s for ENI release, retry stack delete |
 | CFN VPC delete blocked by EKS-installed VPC endpoints leaving orphan ENIs | Manually delete VPC endpoints, wait ~60s for ENIs to release, retry stack delete |
 | NCCL on EKS falls back to TCP with a generic pytorch image | Use an AWS DLC image with `aws-ofi-nccl` baked in |
 | NCCL bootstrap tries `127.0.0.1` in pod network | Set `hostNetwork: true` + `dnsPolicy: ClusterFirstWithHostNet` in the pod spec |

@@ -29,6 +29,45 @@ private_subnet_availability_zone_ids = ["usw2-phx2-az1"]
 existing_nat_gateway_id              = ""
 existing_private_subnet_ids          = []
 
+# LZ: Local Zone egress. When enabled (all three lists non-empty and 1:1),
+#     an LZ-local NAT gateway is created per listed zone, with a
+#     NetworkBorderGroup-scoped EIP so it can attach in the LZ. The private
+#     subnet's default route uses the LZ NAT for matching AZ IDs and falls
+#     back to the regional NAT for standard AZs.
+#
+#     Verified end-to-end in LAX 2026-08-03: traceroute hop 1 goes from
+#     23.8ms (regional NAT hairpin) to 0.091ms (LZ NAT), PyPI TTFB from
+#     111ms to 17ms, Cloudflare 25MB throughput from 44 MB/s to 190 MB/s.
+#
+#     Uncomment to enable. LzPublicSubnetCidr can come from the primary CIDR
+#     (10.192.0.0/16); secondary CIDRs are usually consumed by the private
+#     worker subnet.
+# local_zone_egress_zone_ids       = ["usw2-phx2-az1"]
+# local_zone_public_subnet_cidrs   = ["10.192.20.0/24"]
+# local_zone_network_border_groups = ["us-west-2-phx-2"]
+
+# LZ: FSx Lustre placement.
+#
+#     The upstream fsx_lustre module places FSx in the first instance group's
+#     subnet by default (main.tf:72-77). Since our instance group lives in
+#     the LZ (availability_zone_id below), setting create_new_fsx_filesystem
+#     = true is sufficient to co-locate FSx with compute - no LZ-specific
+#     variable required.
+#
+#     Portability warning: PERSISTENT_2 works in Phoenix (usw2-phx2-az1) and
+#     is what our July benchmarks measured (21x DDP read speedup vs cross-zone
+#     parent-AZ FSx). It is NOT offered in LAX (usw2-lax1-az1) - Terraform will
+#     fail at apply-time with "The requested Lustre configuration: PERSISTENT_2
+#     is not available in this availability zone." In such LZs, either fall
+#     back to fsx_availability_zone_id = "<a-parent-AZ-ID>" for a cross-zone
+#     mount, or set create_new_fsx_filesystem = false.
+create_fsx_module         = true
+create_new_fsx_filesystem = true
+fsx_storage_capacity      = 1200
+fsx_throughput            = 250
+# fsx_availability_zone_id = ""  # empty (default) = same subnet as instance group (in-LZ);
+                                 # set to a parent-AZ ID if the LZ doesn't offer FSx
+
 # Security Group Module Variables
 create_security_group_module = true
 existing_security_group_id   = ""
