@@ -35,69 +35,111 @@ terraform apply -var-file=/path/to/hyperpod-local-zone-quickstart/terraform/eks/
 This mirrors the Slurm variant's pattern (clone-official + supply config) rather
 than shipping a forked or thin-wrapper stack.
 
-### Why this works: a backward-compatible upstream input
+### Why this works: three backward-compatible upstream inputs
 
 The upstream `vpc`, `private_subnet`, and `eks_cluster` modules discover AZs with
 the filter `opt-in-status = "opt-in-not-required"`, which **excludes Local Zones**
-(LZs are opt-in). That single assumption was the only thing preventing the
-reference stack from targeting an LZ. One root variable closes the gap, and it
-defaults to standard-AZ behavior when unset, so existing deployments are unaffected:
+(LZs are opt-in). That was the first assumption preventing the reference stack
+from targeting an LZ. The second was NAT gateway placement — by default the
+module pins the regional NAT to a standard AZ, so LZ workers hairpin every
+packet ~24-35 ms across the region link. Three inputs close both gaps; all
+default to standard-AZ behavior when unset, so existing deployments are unaffected:
 
 | Variable | What it does |
 |---|---|
 | `private_subnet_availability_zone_ids` | Pins the HyperPod private subnets to explicit AZ **IDs** (1:1 with `private_subnet_cidrs`), including opt-in Local Zones the discovery filter would skip. Default `[]` = discover as before. |
+| `local_zone_egress_zone_ids` | List of LZ AZ IDs that get an LZ-local NAT gateway. Default `[]` = no LZ NATs (workers use regional NAT, ~24-35 ms hairpin). |
+| `local_zone_public_subnet_cidrs` | LZ public subnet CIDRs, 1:1 with the above. Typically carved from the VPC primary CIDR. |
+| `local_zone_network_border_groups` | NetworkBorderGroup names for the LZ NAT EIPs, 1:1 with the zone IDs. Required — a plain vpc-scoped EIP cannot attach to a NAT in an LZ subnet. |
 
 The `private_subnet` module emits an `az_to_subnet_map` (AZ ID → subnet ID) that
 the `hyperpod_cluster` module already consumes: each instance group names an
 `availability_zone_id`, resolved to a subnet through that map. Pointing an
 instance group's AZ ID at the LZ subnet lands its workers in the Local Zone.
 
-> **Where this input lives:** it is on the branch
+The `vpc` module additionally emits `nat_gateway_ids_by_zone_id` (AZ ID → NAT ID),
+which the `private_subnet` module consumes to route matching subnets to their
+LZ-local NAT instead of the regional NAT.
+
+> **Where these inputs live:** on the branch
 > [`hpeks-localzone-2026-07-29`](https://github.com/awslabs/awsome-distributed-ai/tree/hpeks-localzone-2026-07-29/1.architectures/7.sagemaker-hyperpod-eks/terraform-modules)
-> of `awsome-distributed-ai` (commit `d24a5bb`), pending merge into `main`. The
-> clone command above checks out that branch, so no hand-patching is needed. The
-> branch adds two backward-compatible inputs — the `private_subnet` module's
-> `availability_zone_ids` variable (used here) and a root `fsx_availability_zone_id`
-> override for placing FSx in a parent AZ (**not** used here; see the FSx note
-> below). Once merged into `main`, drop the `--branch` flag.
+> of `awsome-distributed-ai`. The `private_subnet_availability_zone_ids` input
+> is at commit `d24a5bb` (LZ private subnet, pending merge into `main`). The
+> three `local_zone_*` egress inputs are the follow-up patch validated in LAX
+> on 2026-08-03 — see [`local-zone.tfvars`](local-zone.tfvars) for use, and
+> the LAX A/B numbers in the [Configuration surface](#configuration-surface)
+> section below for the measured evidence. The clone command above checks out
+> the current branch; once fully merged into `main`, drop the `--branch` flag.
 
 ### Architecture
 
 ```
 VPC (10.192.0.0/16 primary + 10.1.0.0/16 secondary CIDR; us-west-2)
 ├── Parent AZ 1 (us-west-2a)
-│   ├── public subnet          → NAT Gateway
+│   ├── public subnet          → regional NAT Gateway
 │   └── EKS control-plane /28   → EKS control plane ENI
-├── Parent AZ 2 (us-west-2b)
+├── Parent AZ 2 (us-west-2b, LZ parent)
 │   └── EKS control-plane /28   → EKS control plane ENI (HA)
 └── Local Zone (us-west-2-phx-2a, usw2-phx2-az1, secondary CIDR 10.1.0.0/16)
-    └── worker subnet           → HyperPod instance group (nodes land here)
+    ├── LZ public subnet        → LZ NAT Gateway (only if local_zone_egress_zone_ids is set)
+    └── worker subnet           → HyperPod instance group (routes to LZ NAT if enabled, else regional NAT)
 ```
 
 Key constraint: **the EKS control plane cannot create ENIs in a Local Zone.**
 Control-plane subnets stay in parent AZs; only the HyperPod workers live in the LZ.
 The worker subnet CIDR is associated as its own secondary VPC block.
 
-> **NAT Gateway placement.** The upstream `vpc` module creates a single NAT Gateway
-> in `public_subnet_1`, whose AZ is chosen by **AZ name** order (`us-west-2a`) — a
-> standard region AZ, never the Local Zone. LZ workers reach it via the private
-> route table's `0.0.0.0/0 → NAT` route, so egress is `LZ → region NAT → internet`.
-> Whether that NAT lands in the LZ's **parent** AZ is not guaranteed: AZ name↔ID
-> mapping is randomized per account (e.g. here `us-west-2a == usw2-az2`, which *is*
-> the parent, but another account may differ). A non-parent NAT adds one
-> intra-region cross-AZ hop — small, and not tunable from tfvars (the public-subnet
-> AZ is hardcoded in the module). The larger lever is `create_vpc_endpoints_module`
-> (enabled here), which keeps S3/ECR/STS traffic off the NAT path entirely.
+> **NAT Gateway placement — the LZ egress fix.** By default the upstream
+> `vpc` module creates a single regional NAT Gateway in `public_subnet_1`,
+> whose AZ is chosen by AZ-name order (typically `us-west-2a`). LZ workers
+> reach it via the private route table's `0.0.0.0/0 → NAT` route, so egress
+> takes the path `LZ → regional NAT → internet` and pays a ~24-35 ms
+> cross-region hop per packet (measured LAX→parent-AZ 23.8 ms; Phoenix→parent-AZ
+> has been observed at ~35 ms).
+>
+> Set the three `local_zone_*` variables in [`local-zone.tfvars`](local-zone.tfvars)
+> to add an LZ-local NAT gateway with a border-group-scoped EIP. Measured
+> impact (LAX, 2026-08-03, single-variable A/B):
+>
+> | | Regional NAT (default) | LZ-local NAT |
+> |---|---:|---:|
+> | Traceroute hop 1 | 23.8 ms | **0.09 ms** (250×) |
+> | PyPI TTFB | 111 ms | **17 ms** (6.5×) |
+> | PyPI throughput | 56 MB/s | **311 MB/s** (5.6×) |
+> | Cloudflare 25 MB | 565 ms | **132 ms** (4.3×) |
+>
+> Does not help origin-anchored services (GitHub, HuggingFace saw ~5%
+> improvement — those are dominated by CDN routing). Does not fix
+> DNS latency, FSx cross-zone syscalls, or EKS API latency — those need
+> separate mitigations.
 
-> **No FSx filesystem here.** FSx for Lustre is not offered in most Local Zones,
-> and mounting it cross-AZ from a parent AZ is not recommended (latency +
-> cross-zone data transfer). This quickstart provisions no FSx filesystem —
-> `create_new_fsx_filesystem` stays at its upstream default (`false`), so no
-> filesystem, PV, PVC, or StorageClass is created. (The upstream `create_fsx_module`
-> default of `true` still installs the idle FSx CSI driver + IAM role; that's
-> harmless and left as-is to keep the diff minimal.) For shared storage, prefer
-> an in-zone option or stage data separately. The upstream branch does carry an
-> `fsx_availability_zone_id` override for the cross-AZ case if you decide you need it.
+> **FSx-in-LZ portability.** FSx for Lustre in Local Zones is offered per-zone,
+> and per-tier availability varies. Verified:
+>
+> - **Phoenix (`usw2-phx2-az1`)**: PERSISTENT_2 offered and works. Our
+>   earlier benchmarks show 21× DDP read speedup vs cross-zone parent-AZ FSx.
+> - **LAX (`usw2-lax1-az1`)**: PERSISTENT_2 **not offered** — CFN/TF create
+>   returns `"The requested Lustre configuration: PERSISTENT_2 is not
+>   available in this availability zone."`. PERSISTENT_1 is offered but the
+>   server runs Lustre 2.10.5, which is incompatible with the AL2023-bundled
+>   2.15.6 client: `"Server MGS version (2.10.5.0) refused connection from
+>   this client with an incompatible version (2.15.6)"`. Verified 2026-08-03.
+>
+> **FSx placement is already configurable upstream on this branch** — no
+> patch needed. `fsx_lustre` module's `subnet_id` (`main.tf:72-77`) resolves to:
+>
+> - **`fsx_availability_zone_id = ""` (default)** → FSx in the first
+>   instance group's subnet. Since our tfvars puts that group in the LZ,
+>   simply setting `create_new_fsx_filesystem = true` co-locates FSx with
+>   compute — no LZ-specific input needed. This is what `local-zone.tfvars`
+>   does by default now.
+> - **`fsx_availability_zone_id = "<parent-AZ-ID>"`** → FSx in that AZ,
+>   mounted cross-zone. Use this in LZs that don't offer FSx (e.g. LAX)
+>   or don't offer PERSISTENT_2.
+>
+> The idle FSx CSI driver + IAM role are installed regardless of
+> `create_new_fsx_filesystem` because `create_fsx_module` defaults to true;
+> harmless if you don't create a filesystem.
 
 ## Prerequisites
 
@@ -188,6 +230,11 @@ requires. Those edits are:
 |---|---|
 | `private_subnet_cidrs` | Trimmed to a single worker subnet CIDR (a secondary VPC block) |
 | `private_subnet_availability_zone_ids` | **Added** — `[<lz-az-id>]`, 1:1 with the CIDR; bypasses the AZ-discovery filter |
+| `local_zone_egress_zone_ids` | **Added, commented** — set to `[<lz-az-id>]` to enable an LZ-local NAT gateway. Verified in LAX 2026-08-03; measured 250× first-hop RTT improvement, 4-6× internet throughput. |
+| `local_zone_public_subnet_cidrs` | **Added, commented** — 1:1 with above. Carve from the VPC primary CIDR (secondary CIDRs are consumed by the worker subnet). |
+| `local_zone_network_border_groups` | **Added, commented** — 1:1 with above. LZ zone name minus the trailing letter (`us-west-2-phx-2a` → `us-west-2-phx-2`). Required for the LZ EIP. |
+| `create_new_fsx_filesystem` | **Set to `true`** — creates an FSx Lustre filesystem in the instance group's subnet (i.e. in-LZ for Phoenix). Upstream default is `false`. |
+| `fsx_storage_capacity` / `fsx_throughput` | **Set to `1200` / `250`** — the PERSISTENT_2 tier validated in Phoenix (our July benchmarks). Not available in LAX; see the FSx-in-LZ portability note. |
 | `instance_groups[].availability_zone_id` | Set to the **LZ** AZ ID — lands workers in the Local Zone |
 | `instance_groups[].training_plan_arn` | Commented example — FTP ARN for reserved LZ capacity (recommended) |
 

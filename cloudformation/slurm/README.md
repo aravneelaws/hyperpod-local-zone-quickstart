@@ -9,7 +9,8 @@ Deploys a HyperPod (Slurm) cluster in an AWS Local Zone. Tested end-to-end with 
 - HyperPod Slurm clusters can run in a Local Zone (Phoenix / `us-west-2-phx-2a` tested; other LZs untested)
 - p5e.48xlarge (H200) is available in PHX LZ via FTP
 - 32 EFA interfaces per node enumerated and functional; 2-node NCCL all-reduce reaches **484 GB/s busBw at 16 GB** — consistent with the full multi-rail fabric being active
-- FSx Lustre in the LZ's **parent AZ** (`us-west-2b`) mounts cleanly from LZ workers over cross-zone network
+- FSx Lustre in the LZ's **parent AZ** (`us-west-2b`) mounts cleanly from LZ workers over cross-zone network (July 2026 baseline). Template now also supports FSx **in the LZ** for co-located storage — see `FsxLocation` below.
+- Template now supports **`LocalZoneEgress=true`** for LZ-local internet egress instead of hairpinning through the parent Region (validated in LAX for the EKS variant; same CFN mechanism)
 - SSH via SSM works
 - Slurm + PyTorch DDP works out of the box
 
@@ -21,60 +22,124 @@ Cross-zone deployment is documented as supported by HyperPod via `OverrideVpcCon
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph vpc["VPC 10.42.0.0/16 (us-west-2)"]
-        direction TB
+Two supported topologies. The default (`LocalZoneEgress=false`) matches the layout used by our July 2026 validation runs. `LocalZoneEgress=true` adds an LZ-local NAT so LZ workers egress directly instead of hairpinning through the parent Region.
 
-        subgraph parent["Parent AZ (us-west-2b)"]
-            nat["NAT Gateway"]
-            fsx[("FSx Lustre<br/>PERSISTENT_2, 1.2 TiB")]
-        end
-
-        subgraph lz["Local Zone (us-west-2-phx-2a)"]
-            ctrl["Slurm Controller<br/>ml.m6i.4xlarge"]
-            w1["Worker 1<br/>ml.p5e.48xlarge<br/>(FTP-reserved)"]
-            w2["Worker 2<br/>ml.p5e.48xlarge<br/>(FTP-reserved)"]
-        end
-
-        s3ep["S3 Gateway Endpoint"]
-    end
-
-    igw((IGW))
-    s3[("S3<br/>lifecycle scripts")]
-
-    igw --- nat
-    nat -->|egress| lz
-    s3ep -.-> s3
-
-    ctrl <-->|Slurm control| w1
-    ctrl <-->|Slurm control| w2
-    w1 <==>|"NCCL over EFA<br/>32 rails, intra-LZ"| w2
-
-    w1 -->|Lustre mount<br/>cross-zone| fsx
-    w2 -->|Lustre mount<br/>cross-zone| fsx
-    ctrl --> fsx
-
-    classDef zone fill:#f9f9f9,stroke:#999,stroke-width:1px
-    class parent,lz zone
-```
-
-**Text summary:**
+**Default topology (`LocalZoneEgress=false`, shipped default):**
 
 ```
 VPC (10.42.0.0/16, us-west-2)
 ├── Parent AZ subnet (us-west-2b, 10.42.10.0/24, public)
-│   ├── NAT Gateway (for LZ egress)
-│   └── FSx Lustre file system (PERSISTENT_2, 1.2 TiB)  ← cross-zone mounted from LZ
+│   ├── NAT Gateway (LZ workers egress via this NAT, ~24-35 ms hairpin)
+│   └── FSx Lustre file system (when FsxLocation=parent, default; cross-zone mounted)
 │
 ├── LZ subnet (us-west-2-phx-2a, 10.42.20.0/24, private)
 │   ├── Controller (ml.m6i.4xlarge)   ← Slurm head node
 │   ├── Worker 1 (ml.p5e.48xlarge)    ← FTP-reserved
 │   └── Worker 2 (ml.p5e.48xlarge)    ← FTP-reserved
 │
-├── S3 gateway endpoint (both subnets)
+├── S3 gateway endpoint (parent public RT + LZ private RT)
 └── Security group: all self→self (EFA); all egress to 0.0.0.0/0
 ```
+
+**LZ-egress topology (`LocalZoneEgress=true`, recommended):**
+
+```
+VPC (10.42.0.0/16, us-west-2)
+├── Parent AZ subnet (us-west-2b, public)
+│   └── NAT Gateway  ← retained but unused for LZ egress
+│
+├── LZ public subnet (us-west-2-phx-2a, 10.42.30.0/24, public)
+│   └── LZ NAT Gateway with border-group EIP (first hop ~0.1 ms)
+│
+├── LZ private subnet (us-west-2-phx-2a, 10.42.20.0/24, private)
+│   ├── Controller (ml.m6i.4xlarge)
+│   ├── Worker 1 (ml.p5e.48xlarge)
+│   ├── Worker 2 (ml.p5e.48xlarge)
+│   └── FSx Lustre (when FsxLocation=lz; in-LZ, co-located)
+│
+└── S3 gateway endpoint (parent + LZ private + LZ public route tables)
+```
+
+## Local Zone egress (`LocalZoneEgress`)
+
+By default, the LZ private subnet's `0.0.0.0/0` route points at a NAT gateway in the parent AZ. Every packet hairpins across the region link before touching the public internet. Measured in LAX (2026-08-03, EKS variant, same network topology at the CFN layer): traceroute hop 1 = 23.8 ms, Cloudflare 25 MB download 44 MB/s, PyPI index fetch 797 ms. The Slurm variant inherits the same architectural bug because it inherits the same NAT-in-parent-AZ pattern.
+
+`LocalZoneEgress=true` adds an LZ-local NAT gateway with a `NetworkBorderGroup`-scoped EIP and an LZ public subnet, and points the LZ private subnet's default route at the LZ NAT. Same LAX rig (single-variable A/B):
+
+| Metric | Off (default) | On | Improvement |
+|---|---:|---:|---:|
+| Traceroute hop 1 | 23.8 ms | **0.095 ms** | 250× |
+| PyPI TTFB | 111 ms | **17 ms** | 6.5× |
+| PyPI throughput | 56 MB/s | **311 MB/s** | 5.6× |
+| Cloudflare 25 MB total | 565 ms | **132 ms** | 4.3× |
+| Ubuntu InRelease total | 1,535 ms | **567 ms** | 2.7× |
+
+Enable it by setting three parameters:
+
+```bash
+aws cloudformation deploy \
+  --template-file cloudformation/slurm/hyperpod-lz-stack.yaml \
+  --stack-name hyperpod-phx-lz \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    LocalZoneEgress=true \
+    LocalZone=us-west-2-phx-2a \
+    NetworkBorderGroup=us-west-2-phx-2 \
+    LzPublicSubnetCidr=10.42.30.0/24     # optional; default matches this
+```
+
+**Why `NetworkBorderGroup` is a separate parameter:** the EIP for an LZ NAT must be allocated in the LZ's border group (a plain vpc-scoped EIP will not attach). The border group is the LZ zone name minus the trailing zone letter (`us-west-2-phx-2a` → `us-west-2-phx-2`), but CFN string functions cannot reliably suffix-strip on multi-letter zone names (`us-west-2-lax-1a` breaks a naive `!Split ['a', ...]`), so it's passed explicitly.
+
+**What LZ egress does not fix.** The scope is public-internet egress from the LZ private subnet. It does not affect DNS resolution paths, cross-zone FSx syscalls, or Slurm↔controller latency (that's intra-VPC and already fast). Origin-anchored services (GitHub, HuggingFace) improved only ~5% in our measurements — those are dominated by CDN routing, not our egress path.
+
+## FSx location (`FsxLocation`)
+
+The template supports three placements, mirroring the EKS variant:
+
+| `FsxLocation` | Where | When to use |
+|---|---|---|
+| `parent` (default) | Parent AZ subnet | LZs that do not offer FSx Lustre, or offer only tiers your workload can't use |
+| `lz` | LZ private subnet | Recommended when the target LZ supports it. FSx co-located with compute; no cross-zone latency. |
+| `none` | No filesystem provisioned | Bring your own, or run without shared storage |
+
+**Per-LZ FSx portability.** Not every LZ offers PERSISTENT_2 or a modern Lustre server version. Verified per-LZ status:
+
+| LZ | PERSISTENT_2 offered? | Notes |
+|---|---|---|
+| Phoenix (`usw2-phx2-az1`) | **Yes** | Validated with 1.2 TiB @ 250 MB/s per TiB. Our earlier EKS benchmarks show 21× DDP read speedup vs cross-zone parent-AZ FSx. |
+| LAX (`usw2-lax1-az1`) | **No** | CFN rejects with `"The requested Lustre configuration: PERSISTENT_2 is not available in this availability zone."` PERSISTENT_1 is offered but runs Lustre server 2.10.5, incompatible with the AL2023-bundled 2.15.6 client (verified 2026-08-03). |
+
+If deploying to a non-Phoenix LZ with `FsxLocation=lz`, verify PERSISTENT_2 availability first or expect create-time failures. Fall back to `FsxLocation=parent` for cross-zone mount, or `FsxLocation=none` to bring your own storage.
+
+**Legacy input (`CreateFsx`).** Still honored for backward compatibility when `FsxLocation=parent` (default). Deploying with the shipped defaults today reproduces the old behavior exactly: one parent-AZ FSx, no LZ FSx.
+
+## Recommended deploy (LZ-egress + in-LZ FSx)
+
+For a HyperPod-supported LZ that offers FSx PERSISTENT_2 (Phoenix today):
+
+```bash
+export AWS_PROFILE=<your-profile>
+export AWS_DEFAULT_REGION=us-west-2
+
+# Deploy with LZ egress + FSx co-located in the LZ
+aws cloudformation deploy \
+  --template-file cloudformation/slurm/hyperpod-lz-stack.yaml \
+  --stack-name hyperpod-phx-lz \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    LocalZoneEgress=true \
+    LocalZone=us-west-2-phx-2a \
+    NetworkBorderGroup=us-west-2-phx-2 \
+    FsxLocation=lz
+
+# Continue with the standard stages
+./upload-lifecycle.sh
+export TRAINING_PLAN_NAME=my-training-plan
+./create-cluster.sh
+./verify-cluster.sh
+```
+
+The `LocalZoneEgress` and `FsxLocation` settings are independent from the "controller in LZ subnet" requirement documented above — those are network-layer topology; controller placement is a HyperPod cluster-configuration concern set in `create-cluster.sh`.
 
 ## Test results (H200 p5e.48xlarge in Phoenix Local Zone)
 
@@ -192,11 +257,13 @@ aws sagemaker wait cluster-deleted --cluster-name hyperpod-phx-lz-cluster
 ## Known caveats
 
 1. **Controller must be in the LZ subnet** in our test — see "Key finding" above. AWS documentation shows cross-zone as supported for standard AZs; treat this as a validated workaround for LZ deployments.
-2. **FSx Lustre is not available in most Local Zones.** We create FSx in the parent AZ and cross-zone mount it. Adequate for functional testing; production workloads should evaluate the I/O throughput impact.
-3. **NAT Gateway in parent AZ** is required for LZ egress (S3, apt, etc.).
-4. **Security group allows all egress to `0.0.0.0/0`.** Standard for HyperPod but broader than production would want; replace with VPC endpoints for a hardened deployment.
-5. **Some `spank_pyxis.so` SPANK warnings** appear during `srun` — cosmetic only, safe to ignore.
-6. **CUDA path is auto-detected** by all smoke tests via `/usr/local/cuda-*/efa/test-cuda-*/`. Works across DLAMI versions.
+2. **FSx-in-LZ is per-LZ.** Phoenix supports PERSISTENT_2 (validated); LAX does not (`"The requested Lustre configuration: PERSISTENT_2 is not available in this availability zone."`) and LAX's PERSISTENT_1 runs Lustre server 2.10.5 which is incompatible with the AL2023-bundled 2.15.6 client. See the `FsxLocation` section for the fallback pattern.
+3. **`LocalZoneEgress=true` requires an explicit `NetworkBorderGroup`.** It's the LZ zone name minus the trailing letter (`us-west-2-phx-2a` → `us-west-2-phx-2`). Without it, the EIP is region-scoped and the LZ NAT create fails with `"EIP is not associated with the border group of the subnet"`.
+4. **Default egress hairpin.** With `LocalZoneEgress=false` (default), LZ workers reach the internet via the parent-AZ NAT — ~24-35 ms per packet. `LocalZoneEgress=true` fixes this; see the LZ egress section above.
+5. **Security group allows all egress to `0.0.0.0/0`.** Standard for HyperPod but broader than production would want; replace with VPC endpoints for a hardened deployment.
+6. **GuardDuty auto-injects a VPC endpoint + security group** in the VPC that CFN can't delete on teardown. Manually `aws ec2 delete-vpc-endpoints --vpc-endpoint-ids <vpce-...>` and `aws ec2 delete-security-group --group-id <GuardDutyManagedSecurityGroup-*>` before retrying stack delete.
+7. **Some `spank_pyxis.so` SPANK warnings** appear during `srun` — cosmetic only, safe to ignore.
+8. **CUDA path is auto-detected** by all smoke tests via `/usr/local/cuda-*/efa/test-cuda-*/`. Works across DLAMI versions.
 
 ## License
 

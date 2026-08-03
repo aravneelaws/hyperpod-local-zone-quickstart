@@ -13,11 +13,11 @@ Parameters:
   ParentAzSubnetCidr:
     Type: String
     Default: 10.42.10.0/24
-    Description: CIDR for the parent AZ (us-west-2b) subnet where head/controller runs. Public.
+    Description: CIDR for the parent AZ (us-west-2b) subnet where the parent-AZ NAT + optional parent-AZ FSx live. Public.
   LzSubnetCidr:
     Type: String
     Default: 10.42.20.0/24
-    Description: CIDR for the LZ subnet where worker (p5e.48xlarge) runs. 256 IPs.
+    Description: CIDR for the LZ private subnet where the worker (p5e.48xlarge) and controller run. 256 IPs.
   ParentAz:
     Type: String
     Default: us-west-2b
@@ -26,11 +26,37 @@ Parameters:
     Type: String
     Default: us-west-2-phx-2a
     Description: Local Zone name for the worker subnet.
+
+  # FSx Lustre parameters. FSx Lustre in Local Zones is available in some LZs
+  # (Phoenix supports PERSISTENT_2). See the LZ features matrix and note per-LZ
+  # server-version quirks (LAX runs Lustre 2.10.5, which is incompatible with
+  # AL2023's bundled 2.15.6 client - verified 2026-08-03).
+  #
+  # FsxLocation is the primary knob:
+  #   none   - no FSx filesystem provisioned
+  #   parent - FSx in the LZ's parent AZ, workers cross-zone mount (~1-5 ms per
+  #            syscall overhead; metadata-heavy workloads suffer badly)
+  #   lz     - FSx co-located with compute in the LZ subnet (recommended when
+  #            the target LZ supports it; verified in Phoenix with PERSISTENT_2)
+  #
+  # The legacy CreateFsx input is still honored for backward compatibility, but
+  # FsxLocation takes precedence when explicitly set to 'none' or 'lz'.
+  FsxLocation:
+    Type: String
+    Default: parent
+    AllowedValues: [none, parent, lz]
+    Description: >
+      Where to place the FSx Lustre filesystem: none | parent | lz.
+      Recommended: lz (co-located, no cross-zone latency).
+      Default parent is the shipped-safe choice for LZs that do not yet offer
+      FSx or offer only incompatible tiers.
   CreateFsx:
     Type: String
     Default: 'true'
     AllowedValues: ['true', 'false']
-    Description: Whether to create an FSx Lustre file system in the parent AZ.
+    Description: >
+      LEGACY. Prefer FsxLocation. Kept for backward compatibility.
+      Ignored when FsxLocation is explicitly set to 'none' or 'lz'.
   FsxStorageCapacityGiB:
     Type: Number
     Default: 1200
@@ -40,10 +66,71 @@ Parameters:
     Type: Number
     Default: 250
     AllowedValues: [125, 250, 500, 1000]
-    Description: FSx Lustre throughput per TiB (MB/s per TiB).
+    Description: FSx Lustre throughput per TiB (MB/s per TiB). Note LZ FSx may support fewer tiers than parent-AZ FSx.
+
+  # ==================== Local Zone egress ====================
+  # By default (LocalZoneEgress=false) LZ workers reach the internet through a
+  # NAT gateway in the parent Region. This hairpins every packet ~24-35 ms to
+  # the parent AZ (measured: LAX->us-west-2b hop1 = 23.8 ms; Phoenix->parent-AZ
+  # has been observed at ~35 ms). Symptom: slow pip/apt/curl, 258 Mbps
+  # download, single-stream TCP BDP-limited to a small window.
+  #
+  # LocalZoneEgress=true adds an LZ-local NAT gateway with a NetworkBorderGroup-
+  # scoped EIP, and points the LZ private subnet's 0.0.0.0/0 at the LZ NAT.
+  # Measured in LAX (2026-08-03, EKS variant, same topology at the network layer):
+  # PyPI TTFB 111 ms -> 17 ms (6.5x); PyPI throughput 56 MB/s -> 311 MB/s (5.6x);
+  # Cloudflare 25 MB 565 ms -> 132 ms (4.3x). Does NOT help origin-anchored
+  # services (github, huggingface see ~5% improvement).
+  LocalZoneEgress:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      false (default) = LZ workers egress via parent-AZ NAT (~24-35 ms hairpin).
+      true = LZ workers egress via LZ-local NAT (measured 4-6x internet
+      speedup, 250x first-hop RTT improvement).
+  NetworkBorderGroup:
+    Type: String
+    Default: us-west-2-phx-2
+    AllowedPattern: '^[a-z]{2}-[a-z]+-[0-9]+-[a-z]+-[0-9]+$'
+    Description: >
+      NetworkBorderGroup for the LZ NAT's EIP. REQUIRED when
+      LocalZoneEgress=true - a plain vpc-scoped EIP cannot attach to a NAT in
+      an LZ subnet. The border group is the LocalZone name minus the trailing
+      zone letter: us-west-2-phx-2a -> us-west-2-phx-2.
+  LzPublicSubnetCidr:
+    Type: String
+    Default: 10.42.30.0/24
+    Description: >
+      Public subnet in the LZ, only used when LocalZoneEgress=true. Carved
+      from the VPC primary CIDR, distinct from LzSubnetCidr.
 
 Conditions:
-  ShouldCreateFsx: !Equals [!Ref CreateFsx, 'true']
+  ShouldUseLzEgress: !Equals [!Ref LocalZoneEgress, 'true']
+
+  # FSx placement. FsxLocation is the primary control. The legacy CreateFsx
+  # input is honored ONLY when FsxLocation is at its default value ('parent')
+  # - keeping existing stacks that never set FsxLocation working exactly as
+  # before.
+  #
+  # Truth table for the derived conditions:
+  #   FsxLocation | CreateFsx | Parent?  LZ?
+  #   none        | *         | no       no
+  #   parent      | true      | yes      no      (default)
+  #   parent      | false     | no       no
+  #   lz          | *         | no       yes
+  FsxLocationIsParent: !Equals [!Ref FsxLocation, parent]
+  FsxLocationIsLz:     !Equals [!Ref FsxLocation, lz]
+  LegacyCreateFsx:     !Equals [!Ref CreateFsx, 'true']
+  ShouldCreateFsx: !And
+    - !Condition FsxLocationIsParent
+    - !Condition LegacyCreateFsx
+  ShouldCreateFsxInLZ: !Condition FsxLocationIsLz
+  # Used to gate the shared FSx security group + its rules. The SG must exist
+  # whenever any FSx filesystem is created.
+  ShouldCreateAnyFsx: !Or
+    - !Condition ShouldCreateFsx
+    - !Condition ShouldCreateFsxInLZ
 
 Resources:
   # ---------- VPC ----------
@@ -93,6 +180,21 @@ Resources:
         - Key: Name
           Value: hyperpod-phx-lz-worker-subnet
 
+  # LZ public subnet - only when LocalZoneEgress=true. Hosts the LZ NAT so
+  # the LZ private subnet can egress locally instead of hairpinning to the
+  # parent Region.
+  LzPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Condition: ShouldUseLzEgress
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref LzPublicSubnetCidr
+      AvailabilityZone: !Ref LocalZone
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: hyperpod-phx-lz-public-subnet
+
   # ---------- Route tables ----------
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -116,7 +218,9 @@ Resources:
       SubnetId: !Ref ParentAzSubnet
       RouteTableId: !Ref PublicRouteTable
 
-  # NAT Gateway (in parent AZ) so LZ private subnet can reach S3/internet
+  # NAT Gateway (in parent AZ) - default egress path when LocalZoneEgress=false.
+  # Even when LocalZoneEgress=true, the parent NAT is retained; some future
+  # topology may still want it (e.g. a bastion in the parent-AZ subnet).
   NatEip:
     Type: AWS::EC2::EIP
     DependsOn: VpcIgwAttachment
@@ -135,6 +239,59 @@ Resources:
         - Key: Name
           Value: hyperpod-phx-lz-nat
 
+  # LZ NAT + border-group EIP (only when LocalZoneEgress=true).
+  # NetworkBorderGroup on the EIP is REQUIRED: a plain 'Domain: vpc' EIP is
+  # region-scoped and cannot attach to a NAT gateway in an LZ subnet. The
+  # border group is the LocalZone name minus the trailing zone letter
+  # (us-west-2-phx-2a -> us-west-2-phx-2). Verified end-to-end in LAX 2026-08-03.
+  LzNatEip:
+    Type: AWS::EC2::EIP
+    Condition: ShouldUseLzEgress
+    DependsOn: VpcIgwAttachment
+    Properties:
+      Domain: vpc
+      NetworkBorderGroup: !Ref NetworkBorderGroup
+      Tags:
+        - Key: Name
+          Value: hyperpod-phx-lz-lz-nat-eip
+
+  LzNatGateway:
+    Type: AWS::EC2::NatGateway
+    Condition: ShouldUseLzEgress
+    Properties:
+      AllocationId: !GetAtt LzNatEip.AllocationId
+      SubnetId: !Ref LzPublicSubnet
+      Tags:
+        - Key: Name
+          Value: hyperpod-phx-lz-lz-nat
+
+  # LZ public route table (only when LocalZoneEgress=true). LZ subnets can
+  # route to a regional IGW; AWS handles the LZ<->IGW path transparently.
+  LzPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Condition: ShouldUseLzEgress
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: hyperpod-phx-lz-lz-public-rt
+
+  LzPublicDefaultRoute:
+    Type: AWS::EC2::Route
+    Condition: ShouldUseLzEgress
+    DependsOn: VpcIgwAttachment
+    Properties:
+      RouteTableId: !Ref LzPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  LzPublicSubnetRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: ShouldUseLzEgress
+    Properties:
+      SubnetId: !Ref LzPublicSubnet
+      RouteTableId: !Ref LzPublicRouteTable
+
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -143,12 +300,13 @@ Resources:
         - Key: Name
           Value: hyperpod-phx-lz-private-rt
 
+  # LZ private subnet default route: LZ NAT if enabled, else parent-AZ NAT.
   DefaultPrivateRoute:
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
+      NatGatewayId: !If [ShouldUseLzEgress, !Ref LzNatGateway, !Ref NatGateway]
 
   LzSubnetRouteAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -156,16 +314,19 @@ Resources:
       SubnetId: !Ref LzSubnet
       RouteTableId: !Ref PrivateRouteTable
 
-  # S3 gateway endpoint (avoid NAT egress for S3 traffic)
+  # S3 gateway endpoint (avoid NAT egress for S3 traffic). Includes the LZ
+  # public route table when LocalZoneEgress=true so LZ NAT traffic to S3
+  # never leaves the LZ.
   S3GatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref Vpc
       ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
       VpcEndpointType: Gateway
-      RouteTableIds:
-        - !Ref PublicRouteTable
-        - !Ref PrivateRouteTable
+      RouteTableIds: !If
+        - ShouldUseLzEgress
+        - [!Ref PublicRouteTable, !Ref PrivateRouteTable, !Ref LzPublicRouteTable]
+        - [!Ref PublicRouteTable, !Ref PrivateRouteTable]
 
   # ---------- Security Group (EFA-friendly: allow all from self) ----------
   ClusterSecurityGroup:
@@ -249,7 +410,7 @@ Resources:
   # ---------- FSx Lustre (parent AZ) ----------
   FsxSecurityGroup:
     Type: AWS::EC2::SecurityGroup
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupDescription: FSx Lustre - allow Lustre traffic from cluster SG
       VpcId: !Ref Vpc
@@ -272,7 +433,7 @@ Resources:
   # We add self-referencing ingress + egress rules on the FSx SG for the LNET port range.
   FsxSgIngressSelf:
     Type: AWS::EC2::SecurityGroupIngress
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupId: !Ref FsxSecurityGroup
       IpProtocol: tcp
@@ -283,7 +444,7 @@ Resources:
 
   FsxSgIngressSelfData:
     Type: AWS::EC2::SecurityGroupIngress
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupId: !Ref FsxSecurityGroup
       IpProtocol: tcp
@@ -294,7 +455,7 @@ Resources:
 
   FsxSgEgressToCluster:
     Type: AWS::EC2::SecurityGroupEgress
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupId: !Ref FsxSecurityGroup
       IpProtocol: tcp
@@ -305,7 +466,7 @@ Resources:
 
   FsxSgEgressToClusterData:
     Type: AWS::EC2::SecurityGroupEgress
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupId: !Ref FsxSecurityGroup
       IpProtocol: tcp
@@ -316,7 +477,7 @@ Resources:
 
   FsxSgEgressSelf:
     Type: AWS::EC2::SecurityGroupEgress
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupId: !Ref FsxSecurityGroup
       IpProtocol: tcp
@@ -327,7 +488,7 @@ Resources:
 
   FsxSgEgressSelfData:
     Type: AWS::EC2::SecurityGroupEgress
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupId: !Ref FsxSecurityGroup
       IpProtocol: tcp
@@ -340,7 +501,7 @@ Resources:
   # covers cluster<->cluster but not cluster->FSx SG).
   ClusterSgEgressFsxControl:
     Type: AWS::EC2::SecurityGroupEgress
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupId: !Ref ClusterSecurityGroup
       IpProtocol: tcp
@@ -351,7 +512,7 @@ Resources:
 
   ClusterSgEgressFsxData:
     Type: AWS::EC2::SecurityGroupEgress
-    Condition: ShouldCreateFsx
+    Condition: ShouldCreateAnyFsx
     Properties:
       GroupId: !Ref ClusterSecurityGroup
       IpProtocol: tcp
@@ -378,6 +539,30 @@ Resources:
         - Key: Name
           Value: hyperpod-phx-lz-fsx
 
+  # ------ Optional: FSx Lustre co-located with compute in the LZ ------
+  # FSx Lustre in Phoenix LZ supports PERSISTENT_2 (verified July 2026;
+  # 21x DDP read speedup vs cross-zone parent-AZ FSx per our benchmarks).
+  # NOT available in every LZ - LAX rejects PERSISTENT_2 at create-time and
+  # its PERSISTENT_1 tier runs Lustre 2.10.5 which is incompatible with
+  # modern (AL2023) clients (verified 2026-08-03).
+  FsxInLZ:
+    Type: AWS::FSx::FileSystem
+    Condition: ShouldCreateFsxInLZ
+    Properties:
+      FileSystemType: LUSTRE
+      StorageCapacity: !Ref FsxStorageCapacityGiB
+      SubnetIds:
+        - !Ref LzSubnet
+      SecurityGroupIds:
+        - !Ref FsxSecurityGroup
+      LustreConfiguration:
+        DeploymentType: PERSISTENT_2
+        PerUnitStorageThroughput: !Ref FsxPerUnitStorageThroughput
+        DataCompressionType: LZ4
+      Tags:
+        - Key: Name
+          Value: hyperpod-phx-lz-fsx-in-lz
+
 Outputs:
   VpcId:
     Value: !Ref Vpc
@@ -403,12 +588,36 @@ Outputs:
   FsxFileSystemId:
     Condition: ShouldCreateFsx
     Value: !Ref FsxFileSystem
-    Description: FSx Lustre file system ID
+    Description: FSx Lustre file system ID (parent AZ, cross-zone mounted)
   FsxDnsName:
     Condition: ShouldCreateFsx
     Value: !GetAtt FsxFileSystem.DNSName
-    Description: FSx Lustre DNS
+    Description: FSx Lustre DNS (parent AZ)
   FsxMountName:
     Condition: ShouldCreateFsx
     Value: !GetAtt FsxFileSystem.LustreMountName
     Description: FSx Lustre mount name (needed for mount command)
+  FsxInLZFileSystemId:
+    Condition: ShouldCreateFsxInLZ
+    Value: !Ref FsxInLZ
+    Description: FSx Lustre in the LZ subnet (co-located with compute)
+  FsxInLZDnsName:
+    Condition: ShouldCreateFsxInLZ
+    Value: !GetAtt FsxInLZ.DNSName
+    Description: FSx Lustre DNS (LZ)
+  FsxInLZMountName:
+    Condition: ShouldCreateFsxInLZ
+    Value: !GetAtt FsxInLZ.LustreMountName
+    Description: FSx Lustre mount name (LZ)
+  LzNatGatewayId:
+    Condition: ShouldUseLzEgress
+    Value: !Ref LzNatGateway
+    Description: LZ-local NAT gateway ID (used by workers when LocalZoneEgress=true)
+  LzNatEipAddress:
+    Condition: ShouldUseLzEgress
+    Value: !Ref LzNatEip
+    Description: Public IP of the LZ NAT (allocated in the NetworkBorderGroup of the LZ)
+  LzPublicSubnetId:
+    Condition: ShouldUseLzEgress
+    Value: !Ref LzPublicSubnet
+    Description: Public subnet in the LZ (only present when LocalZoneEgress=true)
