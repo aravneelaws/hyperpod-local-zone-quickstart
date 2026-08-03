@@ -94,8 +94,8 @@ The worker subnet CIDR is associated as its own secondary VPC block.
 > whose AZ is chosen by AZ-name order (typically `us-west-2a`). LZ workers
 > reach it via the private route table's `0.0.0.0/0 → NAT` route, so egress
 > takes the path `LZ → regional NAT → internet` and pays a ~24-35 ms
-> cross-region hop per packet (measured LAX→parent-AZ 23.8 ms;
-> customer-observed Phoenix→parent-AZ ~35 ms).
+> cross-region hop per packet (measured LAX→parent-AZ 23.8 ms; Phoenix→parent-AZ
+> has been observed at ~35 ms).
 >
 > Set the three `local_zone_*` variables in [`local-zone.tfvars`](local-zone.tfvars)
 > to add an LZ-local NAT gateway with a border-group-scoped EIP. Measured

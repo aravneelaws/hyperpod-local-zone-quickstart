@@ -8,7 +8,7 @@ Deploys a HyperPod cluster orchestrated by **EKS** in an AWS Local Zone. Validat
 
 ## Architecture
 
-Two supported topologies. The default (`LocalZoneEgress=false`) matches the customer-inherited layout and is functionally correct but pays a per-packet cross-region hop for internet egress. `LocalZoneEgress=true` adds an LZ-local NAT so LZ workers egress directly.
+Two supported topologies. The default (`LocalZoneEgress=false`) is functionally correct but pays a per-packet cross-region hop for internet egress. `LocalZoneEgress=true` adds an LZ-local NAT so LZ workers egress directly.
 
 **Default topology (`LocalZoneEgress=false`, shipped default):**
 
@@ -41,9 +41,7 @@ VPC (10.44.0.0/16 primary + 10.45.0.0/16 secondary, us-west-2)
 
 Key insight: **EKS control plane cannot create ENIs in a Local Zone**, so the control plane subnets must be in parent AZs. HyperPod's `AWS::SageMaker::Cluster.VpcConfig.Subnets` places workers in the LZ subnet. Workers join the EKS cluster via HyperPod-managed ENIs.
 
-### The parent-AZ bug that shipped
-
-Prior to 2026-08, this template's `RegionAzs` mapping put the parent NAT in `us-west-2a` while Phoenix LZ's actual parent is `us-west-2b`. That silently added one inter-AZ hop to every LZ egress packet on top of the LZ→region hairpin. Fixed in the same change that introduced `LocalZoneEgress`. If you are upgrading an existing stack: the parent-NAT subnet now moves AZs, which forces subnet replacement — plan a maintenance window or deploy a new stack.
+The parent NAT is deliberately placed in the LZ's parent AZ (`us-west-2b` for Phoenix `usw2-phx2-az1`) rather than the other standard AZ so the LZ→region hop doesn't add an inter-AZ crossing on top of the cross-region hop. This only matters when `LocalZoneEgress=false`; when true, LZ workers don't traverse the parent NAT at all.
 
 ## Deploy workflow
 
@@ -73,7 +71,7 @@ Why 3 stages: the AWS reference CFN uses a Lambda-based helm installer that's cu
 
 ## Local Zone egress (`LocalZoneEgress`)
 
-By default, LZ workers reach the internet through a NAT gateway in the LZ's parent AZ. Every packet hairpins across the region link before touching the public internet. Measured in LAX (2026-08-03, c5.large in `usw2-lax1-az1`): traceroute hop 1 = 23.8 ms, Cloudflare 25 MB download 44 MB/s, PyPI index fetch 797 ms. This is what the customer sees.
+By default, LZ workers reach the internet through a NAT gateway in the LZ's parent AZ. Every packet hairpins across the region link before touching the public internet. Measured in LAX (2026-08-03, c5.large in `usw2-lax1-az1`): traceroute hop 1 = 23.8 ms, Cloudflare 25 MB download 44 MB/s, PyPI index fetch 797 ms.
 
 `LocalZoneEgress=true` adds an LZ-local NAT gateway with a `NetworkBorderGroup`-scoped EIP, splits the worker subnet onto its own route table, and points `0.0.0.0/0` at the LZ NAT. Same LAX rig (side-by-side A/B, single-variable change):
 
@@ -102,7 +100,7 @@ aws cloudformation deploy \
 
 **Why three parameters and not one:** the EIP for an LZ NAT must be allocated in the LZ's `NetworkBorderGroup` (a plain vpc-scoped EIP will not attach). The border-group name is the zone name minus the trailing letter (`us-west-2-phx-2a` → `us-west-2-phx-2`), but CFN string functions cannot reliably suffix-strip on multi-letter zone names (`us-west-2-lax-1a` would break a naive `!Split ['a', ...]`), so `NetworkBorderGroup` is passed explicitly.
 
-**What LZ egress does not fix.** The customer's investigation identified five latency-related symptoms; egress addresses one:
+**What LZ egress does not fix.** Only public-internet egress from the LZ private subnet is addressed. Related LZ-latency concerns are separate:
 
 | Symptom | Fixed by `LocalZoneEgress=true`? |
 |---|---|
@@ -282,7 +280,7 @@ The generic `nvidia/pytorch` container will NOT get EFA performance. Three thing
 1. **Container image** must include `aws-ofi-nccl`. AWS Deep Learning Containers (`763104351884.dkr.ecr.<region>.amazonaws.com/pytorch-training:...-ec2`) do. Vanilla `nvcr.io/nvidia/pytorch` does not.
 2. **Pod networking must be `hostNetwork: true`** with `dnsPolicy: ClusterFirstWithHostNet`. Otherwise NCCL's OOB bootstrap advertises `127.0.0.1` and cross-node ranks can't connect back to rank 0.
 3. **`/dev/shm` must be > 64 MB.** Add a Memory-backed `emptyDir` volume of ~32 GiB mounted at `/dev/shm`. Otherwise NCCL fails with `No space left on device` when allocating shared memory buffers.
-4. **`NCCL_SOCKET_IFNAME`** should exclude noise interfaces: `^lo,docker,veth,cni,pod-id-link,veth_def`. This forces NCCL to use the customer-VPC ENA interface for OOB bootstrap.
+4. **`NCCL_SOCKET_IFNAME`** should exclude noise interfaces: `^lo,docker,veth,cni,pod-id-link,veth_def`. This forces NCCL to use the VPC ENA interface for OOB bootstrap.
 5. **Resource requests**: `nvidia.com/gpu: 8` and `vpc.amazonaws.com/efa: 32` so the device plugins mount the devices into the container.
 
 See `results/nccl-efa-job.yaml` for the full working spec.

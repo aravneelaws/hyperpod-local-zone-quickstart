@@ -59,9 +59,9 @@ Parameters:
   # FsxLocation is the primary knob:
   #   none   - no FSx filesystem provisioned
   #   parent - FSx in the LZ's parent AZ, workers cross-zone mount (~1-5 ms per
-  #            syscall overhead; metadata-heavy workloads suffer badly - the
-  #            customer's Phoenix cluster measured this at 33x for 50 file
-  #            creates on OpenZFS and worse on Lustre)
+  #            syscall overhead; metadata-heavy workloads suffer badly -
+  #            NFS/OpenZFS from an LZ has been observed at 33x slowdown for
+  #            50 file creates, and Lustre metadata is typically worse)
   #   lz     - FSx co-located with compute in the LZ subnet (recommended when
   #            the target LZ supports it; verified in Phoenix with PERSISTENT_2)
   #
@@ -111,9 +111,9 @@ Parameters:
   # ==================== Local Zone egress ====================
   # By default (LocalZoneEgress=false) LZ workers reach the internet through a
   # NAT gateway in the parent Region. This hairpins every packet ~24-35 ms to
-  # the parent AZ (measured: LAX->us-west-2b hop1 = 23.8 ms; matches the customer's
-  # Phoenix->us-west-2a measurement of ~35 ms). Symptom: slow pip/apt/curl,
-  # 258 Mbps download, single-stream TCP BDP-limited to a small window.
+  # the parent AZ (measured: LAX->us-west-2b hop1 = 23.8 ms; Phoenix->parent-AZ
+  # has been observed at ~35 ms). Symptom: slow pip/apt/curl, 258 Mbps
+  # download, single-stream TCP BDP-limited to a small window.
   #
   # LocalZoneEgress=true adds an LZ-local NAT gateway with a NetworkBorderGroup-
   # scoped EIP, splits the LZ worker subnet onto its own route table, and points
@@ -133,8 +133,8 @@ Parameters:
     Default: 'false'
     AllowedValues: ['true', 'false']
     Description: >
-      false (default) = LZ workers egress via parent-AZ NAT (customer's current
-      topology, ~24-35 ms hairpin per packet).
+      false (default) = LZ workers egress via parent-AZ NAT
+      (~24-35 ms hairpin per packet).
       true = LZ workers egress via LZ-local NAT (measured 4-6x internet
       speedup, 250x first-hop RTT improvement).
   LocalZoneName:
@@ -203,8 +203,7 @@ Mappings:
   # For us-west-2 the LZ parent (both Phoenix usw2-phx2-az1 and LAX usw2-lax1-az1)
   # is us-west-2b. PublicSubnet1 hosts the NAT gateway when LocalZoneEgress=false,
   # so it MUST be the parent AZ - otherwise LZ egress takes an extra inter-AZ hop
-  # through us-west-2a before hairpinning to the LZ. This was the shipped
-  # default until 2026-08-03; the swap below is the fix.
+  # through us-west-2a before hairpinning to the LZ.
   #
   # NOTE: LZ->parent-AZ hairpin still costs ~24-35 ms even with the correct AZ;
   # for a real fix, set LocalZoneEgress=true (adds an LZ-local NAT).

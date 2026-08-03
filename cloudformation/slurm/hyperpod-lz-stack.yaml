@@ -71,9 +71,9 @@ Parameters:
   # ==================== Local Zone egress ====================
   # By default (LocalZoneEgress=false) LZ workers reach the internet through a
   # NAT gateway in the parent Region. This hairpins every packet ~24-35 ms to
-  # the parent AZ (measured: LAX->us-west-2b hop1 = 23.8 ms; matches the customer's
-  # Phoenix->us-west-2b measurement of ~35 ms). Symptom: slow pip/apt/curl,
-  # 258 Mbps download, single-stream TCP BDP-limited to a small window.
+  # the parent AZ (measured: LAX->us-west-2b hop1 = 23.8 ms; Phoenix->parent-AZ
+  # has been observed at ~35 ms). Symptom: slow pip/apt/curl, 258 Mbps
+  # download, single-stream TCP BDP-limited to a small window.
   #
   # LocalZoneEgress=true adds an LZ-local NAT gateway with a NetworkBorderGroup-
   # scoped EIP, and points the LZ private subnet's 0.0.0.0/0 at the LZ NAT.
