@@ -29,3 +29,6 @@ outputs.json
 # Test logs (results/ is checked in intentionally)
 logs/
 smoke-tests/logs/
+
+# LZ-egress benchmark results (per-run JSONs are not published)
+benchmarks/lz-egress/results/
