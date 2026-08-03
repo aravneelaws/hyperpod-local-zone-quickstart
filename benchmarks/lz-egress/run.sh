@@ -67,6 +67,10 @@ get_out() {
     --output text
 }
 INSTANCE_ID=$(get_out InstanceId)
+[[ -n "$INSTANCE_ID" && "$INSTANCE_ID" != "None" ]] || {
+  echo "no InstanceId in $STACK outputs; check 'aws cloudformation describe-stacks --stack-name $STACK'" >&2
+  exit 1
+}
 LZ_NAT_EIP=$(get_out LzNatEipAddress 2>/dev/null || echo none)
 PARENT_NAT_EIP=$(get_out ParentNatEipAddress 2>/dev/null || echo none)
 echo "===> Instance: $INSTANCE_ID   ParentNatEip: $PARENT_NAT_EIP   LzNatEip: $LZ_NAT_EIP"

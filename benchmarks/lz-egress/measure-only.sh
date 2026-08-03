@@ -56,13 +56,15 @@ fi
 SCRIPT_B64=$(base64 -i "$MEASURE" | tr -d '\n')
 
 # Build the SSM parameters JSON via python to avoid shell-quoting pitfalls with
-# a long base64 payload.
+# a long base64 payload. The heredoc is un-quoted so the shell substitutes
+# $SCRIPT_B64 / $CONFIG / $FSX_* into the string literals before python parses
+# them; python only serializes the resulting list to valid JSON.
 PARAM_JSON=$(mktemp)
 python3 - <<PY > "$PARAM_JSON"
 import json
 cmds = [
     "set -eu",
-    "echo '${SCRIPT_B64}' | base64 -d > /tmp/measure.sh".replace("\${SCRIPT_B64}", "$SCRIPT_B64"),
+    "echo '$SCRIPT_B64' | base64 -d > /tmp/measure.sh",
     "chmod +x /tmp/measure.sh",
     "LZ_CONFIG=$CONFIG FSX_DNS='$FSX_DNS' FSX_MOUNT='$FSX_MOUNT' /tmp/measure.sh",
 ]
